@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "backbone": "~1.1.2",
-    "ractive-backbone": "~0.1.0",
+    "ractive-backbone": "master",
     "leaflet": "~0.7.2",
     "ractive": "~0.4.0",
     "ractive-events-tap": "~0.1.1",
@@ -27,109 +27,109 @@
     "minnpost-styles": "master"
   },
   "dependencyMap": {
-  "requirejs": {
-    "rname": "requirejs",
-    "js": [
-      "requirejs/require"
-    ]
-  },
-  "almond": {
-    "rname": "almond",
-    "js": [
-      "almond/almond"
-    ]
-  },
-  "text": {
-    "rname": "text",
-    "js": [
-      "text/text"
-    ]
-  },
-  "jquery": {
-    "rname": "jquery",
-    "js": [
-      "jquery/dist/jquery"
-    ],
-    "returns": "$"
-  },
-  "underscore": {
-    "rname": "underscore",
-    "js": [
-      "underscore/underscore"
-    ],
-    "returns": "_"
-  },
-  "backbone": {
-    "rname": "backbone",
-    "js": [
-      "backbone/backbone"
-    ],
-    "returns": "Backbone"
-  },
-  "ractive": {
-    "rname": "ractive",
-    "js": [
-      "ractive/ractive"
-    ],
-    "returns": "Ractive"
-  },
-  "ractive-backbone": {
-    "rname": "ractive-backbone",
-    "js": [
-      "ractive-backbone/Ractive-Backbone"
-    ],
-    "returns": "RactiveBackbone"
-  },
-  "ractive-events-tap": {
-    "rname": "ractive-events-tap",
-    "js": [
-      "ractive-events-tap/ractive-events-tap"
-    ],
-    "returns": "RactiveEventsTap"
-  },
-  "leaflet": {
-    "rname": "leaflet",
-    "js": [
-      "leaflet/dist/leaflet-src"
-    ],
-    "css": [
-      "leaflet/dist/leaflet"
-    ],
-    "images": [
-      "leaflet/dist/images"
-    ],
-    "returns": "L"
-  },
-  "minnpost-styles": {
-    "rname": "mpStyles",
-    "css": [
-      "//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css",
-      "minnpost-styles/dist/minnpost-styles"
-    ],
-    "sass": [
-      "minnpost-styles/styles/main"
-    ]
-  },
-  "mpConfig": {
-    "rname": "mpConfig",
-    "js": [
-      "minnpost-styles/dist/minnpost-styles.config"
-    ],
-    "returns": "mpConfig"
-  },
-  "mpFormatters": {
-    "rname": "mpFormatters",
-    "js": [
-      "minnpost-styles/dist/minnpost-styles.formatters"
-    ],
-    "returns": "mpFormatters"
-  },
-  "mpMaps": {
-    "rname": "mpMaps",
-    "js": [
-      "minnpost-styles/dist/minnpost-styles.maps"
-    ],
-    "returns": "mpMaps"
+    "requirejs": {
+      "rname": "requirejs",
+      "js": [
+        "requirejs/require"
+      ]
+    },
+    "almond": {
+      "rname": "almond",
+      "js": [
+        "almond/almond"
+      ]
+    },
+    "text": {
+      "rname": "text",
+      "js": [
+        "text/text"
+      ]
+    },
+    "jquery": {
+      "rname": "jquery",
+      "js": [
+        "jquery/dist/jquery"
+      ],
+      "returns": "$"
+    },
+    "underscore": {
+      "rname": "underscore",
+      "js": [
+        "underscore/underscore"
+      ],
+      "returns": "_"
+    },
+    "backbone": {
+      "rname": "backbone",
+      "js": [
+        "backbone/backbone"
+      ],
+      "returns": "Backbone"
+    },
+    "ractive": {
+      "rname": "ractive",
+      "js": [
+        "ractive/ractive"
+      ],
+      "returns": "Ractive"
+    },
+    "ractive-backbone": {
+      "rname": "ractive-backbone",
+      "js": [
+        "ractive-backbone/ractive-adaptors-backbone"
+      ],
+      "returns": "RactiveBackbone"
+    },
+    "ractive-events-tap": {
+      "rname": "ractive-events-tap",
+      "js": [
+        "ractive-events-tap/ractive-events-tap"
+      ],
+      "returns": "RactiveEventsTap"
+    },
+    "leaflet": {
+      "rname": "leaflet",
+      "js": [
+        "leaflet/dist/leaflet-src"
+      ],
+      "css": [
+        "leaflet/dist/leaflet"
+      ],
+      "images": [
+        "leaflet/dist/images"
+      ],
+      "returns": "L"
+    },
+    "minnpost-styles": {
+      "rname": "mpStyles",
+      "css": [
+        "//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css",
+        "minnpost-styles/dist/minnpost-styles"
+      ],
+      "sass": [
+        "minnpost-styles/styles/main"
+      ]
+    },
+    "mpConfig": {
+      "rname": "mpConfig",
+      "js": [
+        "minnpost-styles/dist/minnpost-styles.config"
+      ],
+      "returns": "mpConfig"
+    },
+    "mpFormatters": {
+      "rname": "mpFormatters",
+      "js": [
+        "minnpost-styles/dist/minnpost-styles.formatters"
+      ],
+      "returns": "mpFormatters"
+    },
+    "mpMaps": {
+      "rname": "mpMaps",
+      "js": [
+        "minnpost-styles/dist/minnpost-styles.maps"
+      ],
+      "returns": "mpMaps"
+    }
   }
-}
 }

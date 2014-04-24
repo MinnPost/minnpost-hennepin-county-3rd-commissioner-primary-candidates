@@ -5,19 +5,27 @@
  * Ractive classes can be extended but we still need a number of
  * things at instantian, like templates
  */
-define('views', ['jquery', 'underscore', 'Ractive', 'Ractive-Backbone'],
-  function($, _, Ractive, RactiveB) {
+define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive-events-tap',
+  'text!templates/application.mustache',
+  'text!templates/loading.mustache'
+],
+  function($, _, Ractive, RactiveB, RactiveEventTap, tApplication, tLoading) {
   var views = {};
 
   // Base view to extend from
   views.Base = Ractive.extend({
     baseInit: function(options) {
-      this.router = options.router;
-    }
+      this.app = options.app;
+    },
+    adapt: [ 'Backbone' ]
   });
 
   // View for application container
   views.Application = views.Base.extend({
+    template: tApplication,
+    partials: {
+      loading: tLoading
+    },
     init: function() {
       this.baseInit.apply(this, arguments);
     }

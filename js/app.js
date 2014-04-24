@@ -7,16 +7,11 @@
 
 // Create main application
 define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
-  'jquery', 'underscore', 'backbone', 'ractive', 'ractive-backbone', 'ractive-events-tap', 'leaflet', 'mpConfig', 'mpFormatters', 'mpMaps', 
-  'helpers',
-  
-  'text!templates/application.mustache',
-  'text!templates/loading.mustache'
+  'jquery', 'underscore', 'leaflet', 'mpConfig', 'mpFormatters', 'mpMaps',
+  'helpers', 'models', 'collections', 'views'
 ], function(
-  $, _, Backbone, Ractive, RactiveBackbone, RactiveEventsTap, L, mpConfig, mpFormatters, mpMaps, 
-  helpers,
-  
-  tApplication, tLoading
+  $, _, L, mpConfig, mpFormatters, mpMaps,
+  helpers, models, collections, views
   ) {
 
   // Constructor for app
@@ -35,24 +30,13 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
     start: function() {
       var thisApp = this;
 
-      
-      // Override backbone's ajax request for use with JSONP
-      // which is not preferred but we have to support
-      // older browsers
-      Backbone.ajax = helpers.BackboneAJAX;
-
-      // Create router
-      this.router = new routers.Router({
+      // Create main view
+      this.applicationView = new views.Application({
+        el: this.$el,
+        data: {},
         app: this
       });
-      // Start backbone history
-      this.router.start();
-      
-
-      
     },
-
-    
 
     // Default options
     defaultOptions: {
@@ -61,7 +45,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       el: '.minnpost-hennepin-county-3rd-commissioner-primary-candidates-container',
       availablePaths: {
         local: {
-          
+
           css: ['.tmp/css/main.css'],
           images: 'images/',
           data: 'data/'

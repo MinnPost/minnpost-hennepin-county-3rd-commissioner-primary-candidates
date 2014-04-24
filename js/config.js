@@ -4,13 +4,9 @@
  */
 require.config({
   shim: {
-    
-    
-    
   },
   baseUrl: 'js',
   paths: {
-    
     'requirejs': '../bower_components/requirejs/require',
     'almond': '../bower_components/almond/almond',
     'text': '../bower_components/text/text',
@@ -18,7 +14,7 @@ require.config({
     'underscore': '../bower_components/underscore/underscore',
     'backbone': '../bower_components/backbone/backbone',
     'ractive': '../bower_components/ractive/ractive',
-    'ractive-backbone': '../bower_components/ractive-backbone/Ractive-Backbone',
+    'ractive-backbone': '../bower_components/ractive-backbone/ractive-adaptors-backbone',
     'ractive-events-tap': '../bower_components/ractive-events-tap/ractive-events-tap',
     'leaflet': '../bower_components/leaflet/dist/leaflet-src',
     'mpConfig': '../bower_components/minnpost-styles/dist/minnpost-styles.config',
