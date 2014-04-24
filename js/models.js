@@ -18,6 +18,21 @@ define('models', ['underscore', 'backbone'],
 
   });
 
+  // Questions
+  models.Question = models.Base.extend({
+    idAttribute: 'questionid'
+  });
+
+  // Candidates
+  models.Candidate = models.Base.extend({
+    idAttribute: 'candidateid'
+  });
+
+  // Category
+  models.Category = models.Base.extend({
+    idAttribute: 'categoryid'
+  });
+
   // Return what we have
   return models;
 });

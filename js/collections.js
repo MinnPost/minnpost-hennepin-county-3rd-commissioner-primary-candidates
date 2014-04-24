@@ -18,6 +18,21 @@ define('collections', ['underscore', 'backbone', 'models'],
 
   });
 
+  // Questions
+  collections.Questions = collections.Base.extend({
+    model: models.Question
+  });
+
+  // Candidates
+  collections.Candidates = collections.Base.extend({
+    model: models.Candidate
+  });
+
+  // Categories
+  collections.Categories = collections.Base.extend({
+    model: models.Category
+  });
+
   // Return what we have
   return collections;
 });

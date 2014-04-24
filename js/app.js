@@ -8,10 +8,12 @@
 // Create main application
 define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
   'jquery', 'underscore', 'leaflet', 'mpConfig', 'mpFormatters', 'mpMaps',
-  'helpers', 'models', 'collections', 'views'
+  'helpers', 'models', 'collections', 'views',
+  'text!../data/preferences.json'
 ], function(
   $, _, L, mpConfig, mpFormatters, mpMaps,
-  helpers, models, collections, views
+  helpers, models, collections, views,
+  tDataPreferences
   ) {
 
   // Constructor for app
@@ -30,12 +32,116 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
     start: function() {
       var thisApp = this;
 
+      // Load data into models/collections
+      this.loadData();
+
       // Create main view
       this.applicationView = new views.Application({
         el: this.$el,
-        data: {},
+        data: {
+          candidates: this.candidates,
+          questions: this.questions,
+          categories: this.categories
+        },
         app: this
       });
+
+      // Handle events
+      this.handleEvents();
+    },
+
+    // Event handling for various things that cross multiple objects
+    handleEvents: function() {
+      var thisApp = this;
+
+      // Answering question
+      this.applicationView.on('answer', function(e, params) {
+        var answer = params[0];
+        var qid = params[1];
+        thisApp.questions.get(qid)
+          .set('answer', (answer === 'C') ? null : answer)
+          .set('state', (answer === 'C') ? 'unanswered' : 'answered');
+      });
+
+      // When answers change, rebuild candidate elimination
+      this.questions.on('change:answer', function() {
+        thisApp.eliminateCandidates();
+      });
+    },
+
+    // Candidate elimnation.  Go through each question and see
+    // if one elimates a candidate.  It only needs to be elimnated once.
+    eliminateCandidates: function() {
+      var thisApp = this;
+
+      // Reset
+      this.candidates.each(function(c, ci) {
+        c.set('eliminated', false);
+      });
+
+      // Mark
+      this.questions.each(function(q, qi) {
+        if (q.get('answer') === 'Y') {
+          _.each(q.get('eliminatesony'), function(c, ci) {
+            thisApp.candidates.get(c).set('eliminated', true);
+          });
+        }
+        if (q.get('answer') === 'N') {
+          _.each(q.get('eliminatesonn'), function(c, ci) {
+            thisApp.candidates.get(c).set('eliminated', true);
+          });
+        }
+      });
+    },
+
+    // Load data.  Note that we will be storing the user data in here
+    // as we are not persisting user input anywhere outside.
+    loadData: function() {
+      var questionsSheet = 'Questions';
+      var candidatesSheet = 'Candidates';
+
+      // Process the raw data
+      this.rawData = JSON.parse(tDataPreferences);
+      // The data is keyed by the title of the sheet and we don't care
+      this.rawData = this.rawData[_.keys(this.rawData)[0]];
+
+      // Transform candidates
+      this.candidates = new collections.Candidates(
+        _.map(this.rawData[candidatesSheet], function(r, ri) {
+          r.eliminated = false;
+          return r;
+        }),
+        { app: this }
+      );
+
+      // Transform questions
+      this.questions = new collections.Questions(
+        _.map(this.rawData[questionsSheet], function(r, ri) {
+          r.eliminatesonn = _.filter(_.map(r.eliminatesonn.split(','), $.trim), function(i, ii) {
+            return !!i;
+          });
+          r.eliminatesony = _.filter(_.map(r.eliminatesony.split(','), $.trim), function(i, ii) {
+            return !!i;
+          });
+          r.unknownstance = _.filter(_.map(r.unknownstance.split(','), $.trim), function(i, ii) {
+            return !!i;
+          });
+          r.categoryid = mpFormatters.identifier(r.category);
+          r.questionid = _.uniqueId('question-');
+          r.state = 'unanswered';
+          r.answer = null;
+          return r;
+        }),
+        { app: this }
+      );
+
+      // Make categories
+      this.categories = new collections.Categories(
+        this.questions.map(function(q, qi) {
+          return q.pick('category', 'categoryid');
+        }),
+        { app: this }
+      );
     },
 
     // Default options
