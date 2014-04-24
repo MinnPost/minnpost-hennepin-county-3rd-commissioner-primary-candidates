@@ -12,8 +12,7 @@
     "name": "MinnPost",
     "email": "data@minnpost.com"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "grunt": "~0.4.4",
     "grunt-contrib-concat": "~0.4.0",
@@ -27,7 +26,7 @@
     "grunt-contrib-compass": "~0.7.2",
     "grunt-contrib-requirejs": "~0.4.3",
     "grunt-contrib-cssmin": "~0.9.0",
-    "grunt-gss-pull": "~0.1.2",
-    "grunt-s3": "~0.2.0-alpha.3"
+    "grunt-s3": "~0.2.0-alpha.3",
+    "grunt-gss-pull": "git://github.com/zzolo/grunt-gss-pull.git#fix-gid-url-read"
   }
 }

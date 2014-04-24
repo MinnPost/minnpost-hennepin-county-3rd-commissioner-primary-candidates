@@ -119,6 +119,8 @@ There are to main ways to include the necessary HTML in a page in order to run t
 
 *List any hacks used in this project, such as forked repos.  Link to pull request or repo and issue.*
 
+* Ran into some issues with the Grunt GSSPull plugin.  See [pull request](https://github.com/motherjones/grunt-gss-pull/pull/3).
+
 ## About Us
 
 MinnData, the MinnPost data team, is Alan, Tom, and Kaeti and all the awesome contributors to open source projects we utilize.  See our work at [minnpost.com/data](http://minnpost.com/data).
