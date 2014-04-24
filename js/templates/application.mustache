@@ -11,12 +11,16 @@
           </div>
         {{/candidates}}
       </div>
+
+      <div class="options">
+        <button on-tap="clearQuestions" class="button xsmall danger">Clear all</button>
+      </div>
     </div>
 
 
     <div class="category-list">
       {{#categories}}
-        <button class="button small category">
+        <button class="button xsmall category">
           {{ category }}
         </button>
       {{/categories}}

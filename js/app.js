@@ -59,12 +59,21 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
         var answer = params[0];
         var qid = params[1];
         thisApp.questions.get(qid)
-          .set('answer', (answer === 'C') ? null : answer)
-          .set('state', (answer === 'C') ? 'unanswered' : 'answered');
+          .set('answer', (answer === 'C') ? null : answer);
+      });
+
+      // Clear all answers
+      this.applicationView.on('clearQuestions', function(e) {
+        thisApp.questions.each(function(q, qi) {
+          q.set('answer', null);
+        });
       });
 
       // When answers change, rebuild candidate elimination
-      this.questions.on('change:answer', function() {
+      this.questions.on('change:answer', function(model) {
+        // Firgure out state of question
+        model.set('state', (!model.get('answer')) ? 'unanswered' : 'answered');
+        // Figure out what candidates are eliminated
         thisApp.eliminateCandidates();
       });
     },
