@@ -52,6 +52,7 @@ body .node-unpublished {
       min-height: 1.5em;
       text-align: center;
       margin-bottom: .5em;
+      padding: 0 1em;
     }
   }
 
@@ -71,7 +72,7 @@ body .node-unpublished {
     margin-bottom: 3em;
 
     .question {
-      margin-bottom: 2em;
+      margin-bottom: 3em;
 
       &.answered {
       }
@@ -81,7 +82,11 @@ body .node-unpublished {
       }
 
       .question-text {
-        margin-bottom: .5em;
+      }
+
+      .question-category {
+        color: #7A7A7A;
+        margin-bottom: 1em;
       }
 
       .question-options {
@@ -91,7 +96,24 @@ body .node-unpublished {
   }
 
 
+  // Some breakpoints
+  @media screen and (max-width: 700px) {
+    .top-container {
+      .candidate-list .candidate .candidate-name {
+        font-size: .5em;
+        line-height: 1.15em;
+      }
+
+      .one-left {
+        min-height: 0;
+      }
+    }
+  }
+
   // Custom breakpoints
-  @media screen and (max-width: 768px) {
+  @media screen and (max-width: 550px) {
+    .top-container .candidate-list .candidate .candidate-name {
+      display: none;
+    }
   }
 }
