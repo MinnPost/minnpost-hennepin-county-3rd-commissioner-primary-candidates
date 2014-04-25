@@ -130,6 +130,13 @@
         "minnpost-styles/dist/minnpost-styles.maps"
       ],
       "returns": "mpMaps"
+    },
+    "mpNav": {
+      "rname": "mpNav",
+      "js": [
+        "minnpost-styles/dist/minnpost-styles.nav"
+      ],
+      "returns": "mpNav"
     }
   }
 }
