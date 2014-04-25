@@ -14,6 +14,15 @@
           </div>
         {{/candidates}}
       </div>
+
+      <div class="one-left">
+        {{#(candidatesLeft.length === 1)}}
+          It looks like <strong>{{ candidatesLeft.0.name }}</strong> is your best fit.  <a href="#" on-tap="clearQuestions" class="">Start over</a>.
+        {{/()}}
+        {{#(candidatesLeft.length && candidatesLeft.length === 0)}}
+          Somehow you filtered everyone out!  <a href="#" on-tap="clearQuestions" class="">Start over</a>.
+        {{/()}}
+      </div>
     </div>
 
     <div class="spacer"></div>
@@ -26,7 +35,7 @@
       {{/categories}}
     </div>
 
-    <p class="instructions caption">Answer the questions below to filter out candidates.  If a question goes dim, then that means answering it would not help or lead to no candidates.  Feel free to skip a question if you don't have a preference.  If you want to start over, simply <a href="#" on-tap="clearQuestions" class="warning">clear all the answers</a>.</p>
+    <p class="instructions caption">Answer the questions below to filter out candidates.  If a question goes dim, then that means answering it would not help or lead to no candidates.  Feel free to skip a question if you don't have a preference.  If you want to start over, simply <a href="#" on-tap="clearQuestions" class="">clear all the answers</a>.</p>
 
 
     <div class="question-list">

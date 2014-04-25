@@ -85,6 +85,11 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
         thisApp.eliminateCandidates();
         thisApp.eliminateQuestions();
       });
+
+      // Keep a list of candidates in the race
+      this.candidates.on('change:eliminated', function(candidate, eliminated) {
+        thisApp.applicationView.set('candidatesLeft', thisApp.candidates.where({ eliminated: false }));
+      });
     },
 
     // Eliminate questions.  If a question will not affect the candidate
