@@ -44,6 +44,10 @@ body .node-unpublished {
       &.answered {
         opacity: 0.8;
       }
+
+      &.unanswerable {
+        opacity: 0.3;
+      }
     }
   }
 

@@ -39,6 +39,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       this.applicationView = new views.Application({
         el: this.$el,
         data: {
+          options: this.options,
           candidates: this.candidates,
           questions: this.questions,
           categories: this.categories
@@ -64,18 +65,50 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
 
       // Clear all answers
       this.applicationView.on('clearQuestions', function(e) {
-        thisApp.questions.each(function(q, qi) {
-          q.set('answer', null);
-        });
+        thisApp.questions.setAll('answer', null);
+        // Since any questions that haven't been answered will not get a
+        // change event, we force this
+        thisApp.questions.setAll('state', 'unanswered');
       });
 
       // When answers change, rebuild candidate elimination
-      this.questions.on('change:answer', function(model) {
+      this.questions.on('change:answer', function(question, answer) {
         // Firgure out state of question
-        model.set('state', (!model.get('answer')) ? 'unanswered' : 'answered');
-        // Figure out what candidates are eliminated
+        question.set('state', (answer === null) ? 'unanswered' : 'answered');
+        // Figure out what candidates and questions are eliminated
         thisApp.eliminateCandidates();
+        thisApp.eliminateQuestions();
       });
+    },
+
+    // Eliminate questions.  If a question will not affect the candidate
+    // outcome, then there's no reason to show it.
+    eliminateQuestions: function() {
+      var eliminated = _.pluck(this.candidates.where({ eliminated: true }), 'id');
+      var available = _.pluck(this.candidates.where({ eliminated: false }), 'id');
+
+      // Reset any unanswerables
+      this.questions.each(function(q, qi) {
+        q.set('state', (q.get('state') === 'unanswerable') ? 'unanswered' : q.get('state'));
+      });
+
+      // If there is only one or less candidates then all questions are done
+      if (this.candidates.length - eliminated.length <= 1) {
+        this.questions.each(function(q, qi) {
+          q.set('state', (q.get('state') !== 'answered') ? 'unanswerable' : 'answered');
+        });
+      }
+      else {
+        // Determine if the candidates left could be split up by
+        // a question.  So check if the available are either all or none
+        // in a Y answer (TODO look further if there are unknown answers)
+        this.questions.each(function(q, qi) {
+          var diff = _.difference(available, q.get('eliminatesony'));
+          if (q.get('state') !== 'answered' && (_.isEmpty(diff) || _.isEqual(diff, available))) {
+            q.set('state', 'unanswerable');
+          }
+        });
+      }
     },
 
     // Candidate elimnation.  Go through each question and see
@@ -84,9 +117,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       var thisApp = this;
 
       // Reset
-      this.candidates.each(function(c, ci) {
-        c.set('eliminated', false);
-      });
+      this.candidates.setAll('eliminated', false);
 
       // Mark
       this.questions.each(function(q, qi) {

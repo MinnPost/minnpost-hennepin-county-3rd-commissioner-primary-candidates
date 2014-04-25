@@ -36,6 +36,9 @@
             <button on-tap="answer:['N', {{ questionid }}]" class="button small primary {{#(answer === 'N')}}active{{/()}}">No</button>
             <button on-tap="answer:['C', {{ questionid }}]" class="button small info">Clear</button>
           </div>
+
+          <div>{{#eliminatesony}}{{ . }}&nbsp;{{/eliminatesony}}</div>
+          <div>{{#eliminatesonn}}{{ . }}&nbsp;{{/eliminatesonn}}</div>
         </div>
       {{/questions}}
     </div>

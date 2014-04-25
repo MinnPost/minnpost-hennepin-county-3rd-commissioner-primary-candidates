@@ -14,6 +14,12 @@ define('collections', ['underscore', 'backbone', 'models'],
 
       // Call this in other collections
       //collection.NEWCollection.__super__.initialize.apply(this, arguments);
+    },
+
+    setAll: function(set, options) {
+      this.each(function(m, mi) {
+        m.set(set, options);
+      });
     }
 
   });
