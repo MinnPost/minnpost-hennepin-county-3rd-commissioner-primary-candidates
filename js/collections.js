@@ -31,7 +31,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 
   // Candidates
   collections.Candidates = collections.Base.extend({
-    model: models.Candidate
+    model: models.Candidate,
+
+    comparator: 'last'
   });
 
   // Categories

@@ -20,7 +20,14 @@ define('models', ['underscore', 'backbone'],
 
   // Questions
   models.Question = models.Base.extend({
-    idAttribute: 'questionid'
+    idAttribute: 'questionid',
+
+    // Something can come unanswerable, if it has not been answered already
+    // or the answer is a skip
+    makeUnanswerable: function() {
+      var state = this.get('state');
+      this.set('state', (state !== 'answered' || (state === 'answered' && this.get('answer') === 'S')) ? 'unanswerable' : state);
+    }
   });
 
   // Candidates

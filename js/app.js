@@ -64,7 +64,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
         var question = thisApp.questions.get(qid);
         // check if unanswerable
         if (question.get('state') !== 'unanswerable') {
-          question.set('answer', (answer === 'C') ? null : answer);
+          question.set('answer', answer);
         }
       });
 
@@ -106,7 +106,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       // If there is only one or less candidates then all questions are done
       if (this.candidates.length - eliminated.length <= 1) {
         this.questions.each(function(q, qi) {
-          q.set('state', (q.get('state') !== 'answered') ? 'unanswerable' : 'answered');
+          q.makeUnanswerable();
         });
       }
       else {
@@ -116,7 +116,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
         this.questions.each(function(q, qi) {
           var diff = _.difference(available, q.get('eliminatesony'));
           if (q.get('state') !== 'answered' && (_.isEmpty(diff) || _.isEqual(diff, available))) {
-            q.set('state', 'unanswerable');
+            q.makeUnanswerable();
           }
         });
       }
