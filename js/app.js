@@ -7,11 +7,12 @@
 
 // Create main application
 define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
-  'jquery', 'underscore', 'leaflet', 'mpConfig', 'mpFormatters', 'mpMaps',
+  'jquery', 'underscore', 'leaflet',
+  'mpConfig', 'mpFormatters', 'mpMaps', 'mpNav',
   'helpers', 'models', 'collections', 'views',
   'text!../data/preferences.json'
 ], function(
-  $, _, L, mpConfig, mpFormatters, mpMaps,
+  $, _, L, mpConfig, mpFormatters, mpMaps, mpNav,
   helpers, models, collections, views,
   tDataPreferences
   ) {
@@ -57,14 +58,19 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
 
       // Answering question
       this.applicationView.on('answer', function(e, params) {
+        e.original.preventDefault();
         var answer = params[0];
         var qid = params[1];
-        thisApp.questions.get(qid)
-          .set('answer', (answer === 'C') ? null : answer);
+        var question = thisApp.questions.get(qid);
+        // check if unanswerable
+        if (question.get('state') !== 'unanswerable') {
+          question.set('answer', (answer === 'C') ? null : answer);
+        }
       });
 
       // Clear all answers
       this.applicationView.on('clearQuestions', function(e) {
+        e.original.preventDefault();
         thisApp.questions.setAll('answer', null);
         // Since any questions that haven't been answered will not get a
         // change event, we force this

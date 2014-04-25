@@ -3,22 +3,22 @@
 
   <div class="content-container">
 
-    <div class="candidate-list">
-      <div class="row">
+    <div class="navigation horizontal top-container">
+      <div class="candidate-list">
         {{#candidates}}
-          <div class="candidate column-medium-15 {{#eliminated}}eliminated{{/eliminated}}">
-            {{ name }}
+          <div class="candidate {{#eliminated}}eliminated{{/eliminated}} inline-block">
+            <img class="rounded" src="{{ options.paths.images }}{{ candidateid }}.jpg">
+            <div class="candidate-name small">
+              {{ name }}
+            </div>
           </div>
         {{/candidates}}
       </div>
-
-      <div class="options">
-        <button on-tap="clearQuestions" class="button xsmall danger">Clear all</button>
-      </div>
     </div>
 
+    <div class="spacer"></div>
 
-    <div class="category-list">
+    <div class="category-list hide">
       {{#categories}}
         <button class="button xsmall category">
           {{ category }}
@@ -26,19 +26,35 @@
       {{/categories}}
     </div>
 
+    <p class="instructions caption">Answer the questions below to filter out candidates.  If a question goes dim, then that means answering it would not help or lead to no candidates.  Feel free to skip a question if you don't have a preference.  If you want to start over, simply <a href="#" on-tap="clearQuestions" class="warning">clear all the answers</a>.</p>
+
 
     <div class="question-list">
       {{#questions}}
         <div class="question {{ state }}">
-          <div class="question-text">{{ question }}</div>
-          <div class="question-options">
-            <button on-tap="answer:['Y', {{ questionid }}]" class="button small primary {{#(answer === 'Y')}}active{{/()}}">Yes</button>
-            <button on-tap="answer:['N', {{ questionid }}]" class="button small primary {{#(answer === 'N')}}active{{/()}}">No</button>
-            <button on-tap="answer:['C', {{ questionid }}]" class="button small info">Clear</button>
-          </div>
+          <div class="question-text large">{{ question }}</div>
 
-          <div>{{#eliminatesony}}{{ . }}&nbsp;{{/eliminatesony}}</div>
-          <div>{{#eliminatesonn}}{{ . }}&nbsp;{{/eliminatesonn}}</div>
+          <div class="question-options">
+            <button
+              on-tap="answer:['Y', {{ questionid }}]"
+              class="button small
+                {{#(answer !== 'Y')}}info{{/()}}
+                {{#(answer === 'Y')}}active primary{{/()}}"
+            >Yes</button>
+
+            <button
+              on-tap="answer:['N', {{ questionid }}]"
+              class="button small
+                {{#(answer !== 'N')}}info{{/()}}
+                {{#(answer === 'N')}}active primary{{/()}}"
+            >No</button>
+
+            <button
+              on-tap="answer:['C', {{ questionid }}]"
+              class="button button-link small"
+            >Clear</button>
+
+          </div>
         </div>
       {{/questions}}
     </div>

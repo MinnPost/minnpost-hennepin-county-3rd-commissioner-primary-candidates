@@ -27,7 +27,19 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
       loading: tLoading
     },
     init: function() {
+      var thisView = this;
       this.baseInit.apply(this, arguments);
+
+      // This is the best place to stick the top nav.  Only make it happen
+      // once the candidates are loaded
+      this.observe('candidates', function(n, o) {
+        if (!_.isUndefined(n) && !thisView.stuck) {
+          _.delay(function() {
+            $(thisView.el).find('.top-container').mpStick({});
+          }, 500);
+          thisView.stuck = true;
+        }
+      });
     }
   });
 

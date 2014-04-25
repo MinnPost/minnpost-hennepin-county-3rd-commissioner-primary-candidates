@@ -20,6 +20,7 @@ require.config({
     'mpConfig': '../bower_components/minnpost-styles/dist/minnpost-styles.config',
     'mpFormatters': '../bower_components/minnpost-styles/dist/minnpost-styles.formatters',
     'mpMaps': '../bower_components/minnpost-styles/dist/minnpost-styles.maps',
+    'mpNav': '../bower_components/minnpost-styles/dist/minnpost-styles.nav',
     'minnpost-hennepin-county-3rd-commissioner-primary-candidates': 'app'
   }
 });

@@ -14,15 +14,38 @@ body .node-unpublished {
     padding-top: 1em;
   }
 
-  .candidate-list {
-    margin-bottom: 3em;
-    text-align: center;
+  .spacer {
+  }
 
-    .candidate {
+  .top-container {
 
-      &.eliminated {
-        opacity: 0.5;
+    .candidate-list {
+      text-align: center;
+
+      .candidate {
+        vertical-align: top;
+        width: 14%;
+
+        &.eliminated {
+          @include opacity(0.4);
+
+          img {
+            @include filter(grayscale(100%));
+          }
+        }
+
+        img {
+          width: 80%;
+        }
+
+        .candidate-name {
+          margin-bottom: .5em;
+        }
       }
+    }
+
+    .options {
+      text-align: right;
     }
   }
 
@@ -34,19 +57,29 @@ body .node-unpublished {
     }
   }
 
+  .instructions {
+    margin-bottom: 3em;
+  }
 
   .question-list {
     margin-bottom: 3em;
 
     .question {
-      margin-bottom: 1em;
+      margin-bottom: 2em;
 
       &.answered {
-        opacity: 0.8;
       }
 
       &.unanswerable {
-        opacity: 0.3;
+        @include opacity(0.4);
+      }
+
+      .question-text {
+        margin-bottom: .5em;
+      }
+
+      .question-options {
+        margin-left: 1em;
       }
     }
   }
