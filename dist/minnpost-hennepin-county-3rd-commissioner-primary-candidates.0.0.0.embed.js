@@ -21724,6 +21724,207 @@ L.Map.include({
 
 });
 
+/**
+ * Navigation interaction
+ */
+
+(function(global, factory) {
+  // Common JS (i.e. browserify) environment
+  if (typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+    module.exports = factory(require('jquery'), require('underscore'));
+  }
+  // AMD?
+  else if (typeof define === 'function' && define.amd) {
+    define('mpNav',['jquery', 'underscore'], factory);
+  }
+  // Browser global
+  else if (global.jQuery && global._) {
+    global.MP = global.MP || {};
+    global.MP.nav = factory(global.jQuery, global._);
+  }
+  else {
+    throw new Error('Could not find dependencies for MinnPost Styles Navigation.' );
+  }
+})(typeof window !== 'undefined' ? window : this, function($, _) {
+
+  // Wrapper object for some various things
+  var nav = {};
+
+  // Plugin for sticking things.  Defaults are for sticking to top.
+  nav.MPStickDefaults = {
+    activeClass: 'stuck top',
+    wrapperClass: 'minnpost-full-container',
+    topPadding: 0,
+    throttle: 90
+  };
+  function MPStick(element, options) {
+    // Defined some values and process options
+    this.element = element;
+    this.$element = $(element);
+    this._defaults = nav.MPStickDefaults;
+    this.options = $.extend( {}, this._defaults, options);
+    this._name = 'mpStick';
+    this._scrollEvent = 'scroll.mp.mpStick';
+    this._on = false;
+
+    this.init();
+  }
+  MPStick.prototype = {
+    init: function() {
+      // If contaier not passed, use parent
+      this.$container = (this.options.container === undefined) ? this.$element.parent() : $(this.options.container);
+
+      this.elementHeight = this.$element.outerHeight(true);
+
+      // Create a spacer element so content doesn't jump
+      this.$spacer = $('<div>').height(this.elementHeight).hide();
+      this.$element.after(this.$spacer);
+
+      // Add wrapper
+      if (this.options.wrapperClass) {
+        this.$element.wrapInner('<div class="' + this.options.wrapperClass + '"></div>');
+      }
+
+      // Throttle the scoll listen for better perfomance
+      this._throttledListen = _.bind(_.throttle(this.listen, this.options.throttle), this);
+      this._throttledListen();
+      $(window).on(this._scrollEvent, this._throttledListen);
+    },
+
+    listen: function() {
+      var containerTop = this.$container.offset().top;
+      var containerBottom = containerTop + this.$container.height();
+      var scrollTop = $(window).scrollTop();
+      var top = (containerTop - this.options.topPadding);
+      var bottom = (containerBottom - this.elementHeight - this.options.topPadding - 2);
+
+      // Test whether we are in the container and whether its
+      // already stuck or not
+      if (!this._on && scrollTop > top && scrollTop < bottom) {
+        this.on();
+      }
+      else if (this._on && (scrollTop < top || scrollTop > bottom)) {
+        this.off();
+      }
+    },
+
+    on: function() {
+      this.$element.addClass(this.options.activeClass);
+      if (this.options.topPadding) {
+        this.$element.css('top', this.options.topPadding);
+      }
+      this.$spacer.show();
+      this._on = true;
+    },
+
+    off: function() {
+      this.$element.removeClass(this.options.activeClass);
+      if (this.options.topPadding) {
+        this.$element.css('top', 'inherit');
+      }
+      this.$spacer.hide();
+      this._on = false;
+    },
+
+    remove: function() {
+      this.$container.off(this._scrollEvent);
+    }
+  };
+  // Register plugin
+  $.fn.mpStick = function(options) {
+    return this.each(function() {
+      if (!$.data(this, 'mpStick')) {
+        $.data(this, 'mpStick', new MPStick(this, options));
+      }
+    });
+  };
+
+
+
+  // Plugin for scroll spying
+  nav.MPScrollSpyDefaults = {
+    activeClass: 'active',
+    offset: 80,
+    throttle: 200
+  };
+  function MPScrollSpy(element, options) {
+    // Set some initial values and options
+    this.element = element;
+    this.$element = $(element);
+    this._defaults = nav.MPScrollSpyDefaults;
+    this.options = $.extend( {}, this._defaults, options);
+    this._name = 'mpScollSpy';
+    this._scrollEvent = 'scroll.mp.mpScollSpy';
+
+    this.init();
+  }
+  MPScrollSpy.prototype = {
+    init: function() {
+      // Get listeners and targets
+      this.$listeners = this.$element.find('[data-spy-on]');
+      this.$targets = this.$element.find('[data-spy-me]');
+
+      // Throttle the scoll listen for better perfomance
+      this._throttledListen = _.bind(_.throttle(this.listen, this.options.throttle), this);
+      this._throttledListen();
+      $(window).on(this._scrollEvent, this._throttledListen);
+
+      // Handle click
+      this.$listeners.on('click', _.bind(this.gotoClick, this));
+    },
+
+    listen: function() {
+      var thisPlugin = this;
+      var scrollTop = $(window).scrollTop();
+      var target;
+
+      // Find target that is closest to scroll top
+      this.$targets.each(function() {
+        var $target = $(this);
+        if ($target.offset().top <= (scrollTop + (thisPlugin.options.offset + 5))) {
+          target = $target.data('spyMe');
+        }
+      });
+
+      // Once found one, then mark the listener
+      if (target) {
+        this.$listeners.removeClass(this.options.activeClass);
+        this.$element.find('[data-spy-on="' + target + '"]').addClass(this.options.activeClass);
+      }
+    },
+
+    gotoClick: function(e) {
+      e.preventDefault();
+      var $listener = $(e.target);
+
+      this.goto($(e.target).data('spyOn'));
+    },
+
+    goto: function(target) {
+      var $target = this.$element.find('[data-spy-me="' + target + '"]');
+      var top = $target.offset().top;
+
+      $('html, body').animate({
+        scrollTop: (top - this.options.offset)
+      }, 600);
+    },
+
+    remove: function() {
+      this.$container.off(this._scrollEvent);
+    }
+  };
+  // Register plugin
+  $.fn.mpScrollSpy = function(options) {
+    return this.each(function() {
+      if (!$.data(this, 'mpScrollSpy')) {
+        $.data(this, 'mpScrollSpy', new MPScrollSpy(this, options));
+      }
+    });
+  };
+
+  return nav;
+});
+
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -23504,6 +23705,12 @@ define('collections', ['underscore', 'backbone', 'models'],
 
       // Call this in other collections
       //collection.NEWCollection.__super__.initialize.apply(this, arguments);
+    },
+
+    setAll: function(set, options) {
+      this.each(function(m, mi) {
+        m.set(set, options);
+      });
     }
 
   });
@@ -36380,7 +36587,7 @@ define('text',['module'], function (module) {
 });
 
 
-define('text!templates/application.mustache',[],function () { return '<div class="application-container">\n  <div class="message-container"></div>\n\n  <div class="content-container">\n\n    <div class="candidate-list">\n      <div class="row">\n        {{#candidates}}\n          <div class="candidate column-medium-15 {{#eliminated}}eliminated{{/eliminated}}">\n            {{ name }}\n          </div>\n        {{/candidates}}\n      </div>\n\n      <div class="options">\n        <button on-tap="clearQuestions" class="button xsmall danger">Clear all</button>\n      </div>\n    </div>\n\n\n    <div class="category-list">\n      {{#categories}}\n        <button class="button xsmall category">\n          {{ category }}\n        </button>\n      {{/categories}}\n    </div>\n\n\n    <div class="question-list">\n      {{#questions}}\n        <div class="question {{ state }}">\n          <div class="question-text">{{ question }}</div>\n          <div class="question-options">\n            <button on-tap="answer:[\'Y\', {{ questionid }}]" class="button small primary {{#(answer === \'Y\')}}active{{/()}}">Yes</button>\n            <button on-tap="answer:[\'N\', {{ questionid }}]" class="button small primary {{#(answer === \'N\')}}active{{/()}}">No</button>\n            <button on-tap="answer:[\'C\', {{ questionid }}]" class="button small info">Clear</button>\n          </div>\n        </div>\n      {{/questions}}\n    </div>\n\n\n\n  </div>\n\n  <div class="footnote-container">\n    <div class="footnote">\n      <p>Some code, techniques, and data on <a href="https://github.com/minnpost/minnpost-hennepin-county-3rd-commissioner-primary-candidates" target="_blank">Github</a>.</p>\n\n        <p>Some map data © OpenStreetMap contributors; licensed under the <a href="http://www.openstreetmap.org/copyright" target="_blank">Open Data Commons Open Database License</a>.  Some map design © MapBox; licensed according to the <a href="http://mapbox.com/tos/" target="_blank">MapBox Terms of Service</a>.  Location geocoding provided by <a href="http://www.mapquest.com/" target="_blank">Mapquest</a> and is not guaranteed to be accurate.</p>\n\n    </div>\n  </div>\n</div>\n';});
+define('text!templates/application.mustache',[],function () { return '<div class="application-container">\n  <div class="message-container"></div>\n\n  <div class="content-container">\n\n    <div class="navigation horizontal top-container">\n      <div class="candidate-list">\n        {{#candidates}}\n          <div class="candidate {{#eliminated}}eliminated{{/eliminated}} inline-block">\n            <img class="rounded" src="{{ options.paths.images }}{{ candidateid }}.jpg">\n            <div class="candidate-name small">\n              {{ name }}\n            </div>\n          </div>\n        {{/candidates}}\n      </div>\n\n      <div class="one-left">\n        {{#(candidatesLeft.length === 1)}}\n          It looks like <strong>{{ candidatesLeft.0.name }}</strong> is your best fit.  <a href="#" on-tap="clearQuestions" class="">Start over</a>.\n        {{/()}}\n        {{#(candidatesLeft.length && candidatesLeft.length === 0)}}\n          Somehow you filtered everyone out!  <a href="#" on-tap="clearQuestions" class="">Start over</a>.\n        {{/()}}\n      </div>\n    </div>\n\n    <div class="spacer"></div>\n\n    <div class="category-list hide">\n      {{#categories}}\n        <button class="button xsmall category">\n          {{ category }}\n        </button>\n      {{/categories}}\n    </div>\n\n    <p class="instructions caption">Answer the questions below to filter out candidates.  If a question goes dim, then that means answering it would not help or lead to no candidates.  Feel free to skip a question if you don\'t have a preference.  If you want to start over, simply <a href="#" on-tap="clearQuestions" class="">clear all the answers</a>.</p>\n\n\n    <div class="question-list">\n      {{#questions}}\n        <div class="question {{ state }}">\n          <div class="question-text large">{{ question }}</div>\n\n          <div class="question-options">\n            <button\n              on-tap="answer:[\'Y\', {{ questionid }}]"\n              class="button small\n                {{#(answer !== \'Y\')}}info{{/()}}\n                {{#(answer === \'Y\')}}active primary{{/()}}"\n            >Yes</button>\n\n            <button\n              on-tap="answer:[\'N\', {{ questionid }}]"\n              class="button small\n                {{#(answer !== \'N\')}}info{{/()}}\n                {{#(answer === \'N\')}}active primary{{/()}}"\n            >No</button>\n\n            <button\n              on-tap="answer:[\'C\', {{ questionid }}]"\n              class="button button-link small"\n            >Clear</button>\n\n          </div>\n        </div>\n      {{/questions}}\n    </div>\n\n\n\n  </div>\n\n  <div class="footnote-container">\n    <div class="footnote">\n      <p>Some code, techniques, and data on <a href="https://github.com/minnpost/minnpost-hennepin-county-3rd-commissioner-primary-candidates" target="_blank">Github</a>.</p>\n\n        <p>Some map data © OpenStreetMap contributors; licensed under the <a href="http://www.openstreetmap.org/copyright" target="_blank">Open Data Commons Open Database License</a>.  Some map design © MapBox; licensed according to the <a href="http://mapbox.com/tos/" target="_blank">MapBox Terms of Service</a>.  Location geocoding provided by <a href="http://www.mapquest.com/" target="_blank">Mapquest</a> and is not guaranteed to be accurate.</p>\n\n    </div>\n  </div>\n</div>\n';});
 
 
 define('text!templates/loading.mustache',[],function () { return '<div class="loading-container">\n  <div class="loading"><span>Loading...</span></div>\n</div>';});
@@ -36414,7 +36621,19 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
       loading: tLoading
     },
     init: function() {
+      var thisView = this;
       this.baseInit.apply(this, arguments);
+
+      // This is the best place to stick the top nav.  Only make it happen
+      // once the candidates are loaded
+      this.observe('candidates', function(n, o) {
+        if (!_.isUndefined(n) && !thisView.stuck) {
+          _.delay(function() {
+            $(thisView.el).find('.top-container').mpStick({});
+          }, 500);
+          thisView.stuck = true;
+        }
+      });
     }
   });
 
@@ -36423,7 +36642,7 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
 });
 
 
-define('text!../data/preferences.json',[],function () { return '{"Candidate guide to Hennepin County 3rd Commissioner Primary":{"Questions":[{"category":"Partisanship","question":"Do you want a candidate who sought DFL endorsement?","eliminatesony":"carney, reuer","eliminatesonn":"greene, mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":1},{"category":"Union support","question":"Do you want a candidate with union support?","eliminatesony":"greene, carney, reuer","eliminatesonn":"mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":2},{"category":"Union support","question":"Do you want a candidate supported by AFSCME, Teamsters, and Hennepin County Sheriff’s Deputies?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":3},{"category":"Union support","question":"Do you want a candidate supported by the Carpenters, Building Trades, Laborerers, Locomotive workers?","eliminatesony":"mavity, greene, carney, reuer, schweigert","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":4},{"category":"Residence","question":"Do you want a candidate who lives in Minneapolis?","eliminatesony":"mavity","eliminatesonn":"greene, carney, reuer, kelash, schweigert","unknownstance":"","na":"","rowNumber":5},{"category":"Residence","question":"Do you want a candidate who lives in St. Louis Park?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":6},{"category":"Elected experience","question":"Do you want a candidate with previous elected experience?","eliminatesony":"carney, reuer, schweigert","eliminatesonn":"greene, kelash, mavity","unknownstance":"","na":"","rowNumber":7},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who endorsed Mark Andrew for 2013 Minneapolis mayor?","eliminatesony":"carney, reuer, schweigert, mavity","eliminatesonn":"greene, kelash","unknownstance":"","na":"","rowNumber":8},{"category":"Southwest LRT","question":"Do you want a candidate who would replace Southwest LRT with busways?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":9},{"category":"Endorsements","question":"Do you want a candidate endorsed by Progressive Majority and the St. Louis Park City Council?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":10},{"category":"Endorsements","question":"Do you want a candidate endorsed by Stonewall DFL, Dee Long, Margaret Kelliher and Hennepin Commissioner Linda Higgins?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":11},{"category":"Endorsements","question":"Do you want a candidate endorsed by Rep. Joe Mullery and former NRP director Bob Miller? ","eliminatesony":"mavity, carney, reuer, schweigert, greene","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":12},{"category":"Endorsements","question":"Do you want a candidate endorsed by Minneapolis School Board members Mammen, Monserrate and Gagnon?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":13},{"category":"Endorsements","question":"Do you want a candidate endorsed by County Attoney Mike Freeman and Reps. Karen Clark & Susan Allen?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":14},{"category":"Endorsements","question":"Do you want a candidate endorsed by the GOP?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":15}],"Candidates":[{"candidateid":"carney","name":"Bob “Again” Carney Jr.","profileurl":"http://www.minnpost.com/community-voices/2014/04/hennepin-commissioner-candidate-demand-southwest-lrt-alternatives","rowNumber":1},{"candidateid":"reuer","name":"Bob Reuer","profileurl":"","rowNumber":2},{"candidateid":"greene","name":"Marion Greene","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-marion-greene","rowNumber":3},{"candidateid":"mavity","name":"Anne Mavity","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-anne-mavity","rowNumber":4},{"candidateid":"kelash","name":"Ken Kelash","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ken-kelash","rowNumber":5},{"candidateid":"schweigert","name":"Ben Schweigert","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ben-schweigert","rowNumber":6}]}}';});
+define('text!../data/preferences.json',[],function () { return '{"Candidate guide to Hennepin County 3rd Commissioner Primary":{"Questions":[{"category":"Partisanship","question":"Do you want a candidate who sought DFL endorsement?","eliminatesony":"carney, reuer","eliminatesonn":"greene, mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":1},{"category":"Union support","question":"Do you want a candidate with union support?","eliminatesony":"greene, carney, reuer","eliminatesonn":"mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":2},{"category":"Union support","question":"Do you want a candidate supported by AFSCME, Teamsters, and Hennepin County Sheriff’s Deputies?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":3},{"category":"Union support","question":"Do you want a candidate supported by the Carpenters, Building Trades, Laborerers, Locomotive workers?","eliminatesony":"mavity, greene, carney, reuer, schweigert","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":4},{"category":"Residence","question":"Do you want a candidate who lives in Minneapolis?","eliminatesony":"mavity","eliminatesonn":"greene, carney, reuer, kelash, schweigert","unknownstance":"","na":"","rowNumber":5},{"category":"Residence","question":"Do you want a candidate who lives in St. Louis Park?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":6},{"category":"Elected experience","question":"Do you want a candidate with previous elected experience?","eliminatesony":"carney, reuer, schweigert","eliminatesonn":"greene, kelash, mavity","unknownstance":"","na":"","rowNumber":7},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who endorsed Mark Andrew for 2013 Minneapolis mayor?","eliminatesony":"carney, reuer, schweigert, mavity","eliminatesonn":"greene, kelash","unknownstance":"","na":"","rowNumber":8},{"category":"Southwest LRT","question":"Do you want a candidate who would replace Southwest LRT with busways?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":9},{"category":"Endorsements","question":"Do you want a candidate endorsed by Progressive Majority and the St. Louis Park City Council?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":10},{"category":"Endorsements","question":"Do you want a candidate endorsed by Stonewall DFL, Dee Long, Margaret Kelliher and Hennepin Commissioner Linda Higgins?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":11},{"category":"Endorsements","question":"Do you want a candidate endorsed by Rep. Joe Mullery and former NRP director Bob Miller? ","eliminatesony":"mavity, carney, reuer, schweigert, greene","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":12},{"category":"Endorsements","question":"Do you want a candidate endorsed by Minneapolis School Board members Mammen, Monserrate and Gagnon?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":13},{"category":"Endorsements","question":"Do you want a candidate endorsed by County Attoney Mike Freeman and Reps. Karen Clark & Susan Allen?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":14},{"category":"Endorsements","question":"Do you want a candidate endorsed by the GOP?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":15}],"Candidates":[{"candidateid":"carney","name":"Bob Carney Jr.","profileurl":"http://www.minnpost.com/community-voices/2014/04/hennepin-commissioner-candidate-demand-southwest-lrt-alternatives","rowNumber":1},{"candidateid":"reuer","name":"Bob Reuer","profileurl":"","rowNumber":2},{"candidateid":"greene","name":"Marion Greene","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-marion-greene","rowNumber":3},{"candidateid":"mavity","name":"Anne Mavity","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-anne-mavity","rowNumber":4},{"candidateid":"kelash","name":"Ken Kelash","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ken-kelash","rowNumber":5},{"candidateid":"schweigert","name":"Ben Schweigert","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ben-schweigert","rowNumber":6}]}}';});
 
 /**
  * Main application file for: minnpost-hennepin-county-3rd-commissioner-primary-candidates
@@ -36434,11 +36653,12 @@ define('text!../data/preferences.json',[],function () { return '{"Candidate guid
 
 // Create main application
 define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
-  'jquery', 'underscore', 'leaflet', 'mpConfig', 'mpFormatters', 'mpMaps',
+  'jquery', 'underscore', 'leaflet',
+  'mpConfig', 'mpFormatters', 'mpMaps', 'mpNav',
   'helpers', 'models', 'collections', 'views',
   'text!../data/preferences.json'
 ], function(
-  $, _, L, mpConfig, mpFormatters, mpMaps,
+  $, _, L, mpConfig, mpFormatters, mpMaps, mpNav,
   helpers, models, collections, views,
   tDataPreferences
   ) {
@@ -36466,6 +36686,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       this.applicationView = new views.Application({
         el: this.$el,
         data: {
+          options: this.options,
           candidates: this.candidates,
           questions: this.questions,
           categories: this.categories
@@ -36483,26 +36704,68 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
 
       // Answering question
       this.applicationView.on('answer', function(e, params) {
+        e.original.preventDefault();
         var answer = params[0];
         var qid = params[1];
-        thisApp.questions.get(qid)
-          .set('answer', (answer === 'C') ? null : answer);
+        var question = thisApp.questions.get(qid);
+        // check if unanswerable
+        if (question.get('state') !== 'unanswerable') {
+          question.set('answer', (answer === 'C') ? null : answer);
+        }
       });
 
       // Clear all answers
       this.applicationView.on('clearQuestions', function(e) {
-        thisApp.questions.each(function(q, qi) {
-          q.set('answer', null);
-        });
+        e.original.preventDefault();
+        thisApp.questions.setAll('answer', null);
+        // Since any questions that haven't been answered will not get a
+        // change event, we force this
+        thisApp.questions.setAll('state', 'unanswered');
       });
 
       // When answers change, rebuild candidate elimination
-      this.questions.on('change:answer', function(model) {
+      this.questions.on('change:answer', function(question, answer) {
         // Firgure out state of question
-        model.set('state', (!model.get('answer')) ? 'unanswered' : 'answered');
-        // Figure out what candidates are eliminated
+        question.set('state', (answer === null) ? 'unanswered' : 'answered');
+        // Figure out what candidates and questions are eliminated
         thisApp.eliminateCandidates();
+        thisApp.eliminateQuestions();
       });
+
+      // Keep a list of candidates in the race
+      this.candidates.on('change:eliminated', function(candidate, eliminated) {
+        thisApp.applicationView.set('candidatesLeft', thisApp.candidates.where({ eliminated: false }));
+      });
+    },
+
+    // Eliminate questions.  If a question will not affect the candidate
+    // outcome, then there's no reason to show it.
+    eliminateQuestions: function() {
+      var eliminated = _.pluck(this.candidates.where({ eliminated: true }), 'id');
+      var available = _.pluck(this.candidates.where({ eliminated: false }), 'id');
+
+      // Reset any unanswerables
+      this.questions.each(function(q, qi) {
+        q.set('state', (q.get('state') === 'unanswerable') ? 'unanswered' : q.get('state'));
+      });
+
+      // If there is only one or less candidates then all questions are done
+      if (this.candidates.length - eliminated.length <= 1) {
+        this.questions.each(function(q, qi) {
+          q.set('state', (q.get('state') !== 'answered') ? 'unanswerable' : 'answered');
+        });
+      }
+      else {
+        // Determine if the candidates left could be split up by
+        // a question.  So check if the available are either all or none
+        // in a Y answer (TODO look further if there are unknown answers)
+        this.questions.each(function(q, qi) {
+          var diff = _.difference(available, q.get('eliminatesony'));
+          if (q.get('state') !== 'answered' && (_.isEmpty(diff) || _.isEqual(diff, available))) {
+            q.set('state', 'unanswerable');
+          }
+        });
+      }
     },
 
     // Candidate elimnation.  Go through each question and see
@@ -36511,9 +36774,7 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
       var thisApp = this;
 
       // Reset
-      this.candidates.each(function(c, ci) {
-        c.set('eliminated', false);
-      });
+      this.candidates.setAll('eliminated', false);
 
       // Mark
       this.questions.each(function(q, qi) {
@@ -36615,8 +36876,8 @@ define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
             'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/minnpost-hennepin-county-3rd-commissioner-primary-candidates.libs.min.ie.css',
             'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/minnpost-hennepin-county-3rd-commissioner-primary-candidates.latest.min.ie.css'
           ],
-          images: 'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/minnpost-hennepin-county-3rd-commissioner-primary-candidates/images/',
-          data: 'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/minnpost-hennepin-county-3rd-commissioner-primary-candidates/data/'
+          images: 'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/images/',
+          data: 'https://s3.amazonaws.com/data.minnpost/projects/minnpost-hennepin-county-3rd-commissioner-primary-candidates/data/'
         }
       }
     },
