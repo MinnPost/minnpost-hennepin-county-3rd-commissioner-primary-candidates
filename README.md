@@ -2,21 +2,17 @@
 
 A candidate guide to Hennepin County 3rd Commissioner Primary on April 29, 2014.
 
-You can see this project in action at *published story link goes here*.
+You can see this project in action at [MinnPost](http://www.minnpost.com/data/2014/04/last-minute-hennepin-county-candidate-picking-tool)].
 
 *Unless otherwise noted, MinnPost projects on [Github](https://github.com/minnpost) are story-driven and meant for transparency sake and not focused on re-use.  For a list of our more reusable projects, go to [code.minnpost.com](http://code.minnpost.com).*
 
 ## Data
 
-*Describe the data sources here.  Use links and URLs to show where the data came from.  Put small sized originals or modified data sources in the ```data``` folder*
-
-*For larger data sources that may need to be processed, provide instructions on how to download.  For instance:  ```cd data && wget blah.txt```.  Also, make sure to put an entry in the ```.gitignore```.*
+Candidate questions based around candidate profiles created by MinnPost.  Data stored on [Google Spreadsheets](https://docs.google.com/a/minnpost.com/spreadsheets/d/1lVitgC5lfone5eoBiKj59-ZvB5dSkE0smCDk76tnSjU/edit#gid=0) and can be imported into the project with `grunt data`.
 
 ## Data processing
 
-The following describes how the data was processed and is not necessarily needed to run or install the application, but more included for reference, transparency, and development.
-
-*Describe data processing here, include commands, or document any manual steps taken.  Put data processing scripts or configurations in the ```data-processing``` folder.*
+Data processing was not needed for this project.
 
 ## Development and running locally
 
@@ -30,8 +26,6 @@ All commands are assumed to be on the [command line](http://en.wikipedia.org/wik
    * On a Mac, do: `brew install node`
 1. Optionally, for development, install [Grunt](http://gruntjs.com/): `npm install -g grunt-cli`
 1. Install [Bower](http://bower.io/): `npm install -g bower`
-
-
 1. Install [Sass](http://sass-lang.com/): `gem install sass`
    * On a Mac do: `sudo gem install sass`
    1. Install [Compass](http://compass-style.org/): `gem install compass`
@@ -46,8 +40,6 @@ Get the code for this project and install the necessary dependency libraries and
 1. Go into the template directory: `cd minnpost-hennepin-county-3rd-commissioner-primary-candidates`
 1. Install NodeJS packages: `npm install`
 1. Install Bower components: `bower install`
-
-
 1. Because Leaflet comes unbuilt, we need to build it: `cd bower_components/leaflet/ && npm install && jake; cd -;`
 
 
@@ -71,7 +63,7 @@ Adding libraries is not difficult, but there are a few steps.
 
 1. User bower to install the appropriate library: `bower install library --save`
 1. Add the appropriate reference in `js/config.js` so that RequireJS knows about it.
-1. Add an entry in the `dependencyMap` object in `bower.json`.  This is used to automatically collect resources in the build process.  It is possible, like with `minnpost-styles` that multiple entries will need to be made, one ber `.js` file.  Here is an example:
+1. Add an entry in the `dependencyMap` object in `bower.json`.  This is used to automatically collect resources in the build process.  It is possible, like with `minnpost-styles` that multiple entries will need to be made, one per `.js` file.  Here is an example:
 
 ```
 // Should be bower identifier.  Order matters for build, meaning that any dependencies should come first.
