@@ -23744,8 +23744,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 });
 
 /*
-	Ractive.js v0.4.0
-	2014-04-08 - commit 276c0e2b
+	ractive-legacy.js v0.4.0
+	2014-04-27 - commit 80190fdf 
 
 	http://ractivejs.org
 	http://twitter.com/RactiveJS
@@ -23759,7 +23759,324 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var noConflict = global.Ractive;
 
-	var legacy = undefined;
+	var legacy = function() {
+
+		var win, doc, exportedShims;
+		if ( typeof window === 'undefined' ) {
+			return;
+		}
+		win = window;
+		doc = win.document;
+		exportedShims = {};
+		if ( !doc ) {
+			return;
+		}
+		// Shims for older browsers
+		if ( !Date.now ) {
+			Date.now = function() {
+				return +new Date();
+			};
+		}
+		if ( !String.prototype.trim ) {
+			String.prototype.trim = function() {
+				return this.replace( /^\s+/, '' ).replace( /\s+$/, '' );
+			};
+		}
+		// Polyfill for Object.keys
+		// https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Object/keys
+		if ( !Object.keys ) {
+			Object.keys = function() {
+				var hasOwnProperty = Object.prototype.hasOwnProperty,
+					hasDontEnumBug = !{
+						toString: null
+					}.propertyIsEnumerable( 'toString' ),
+					dontEnums = [
+						'toString',
+						'toLocaleString',
+						'valueOf',
+						'hasOwnProperty',
+						'isPrototypeOf',
+						'propertyIsEnumerable',
+						'constructor'
+					],
+					dontEnumsLength = dontEnums.length;
+				return function( obj ) {
+					if ( typeof obj !== 'object' && typeof obj !== 'function' || obj === null ) {
+						throw new TypeError( 'Object.keys called on non-object' );
+					}
+					var result = [];
+					for ( var prop in obj ) {
+						if ( hasOwnProperty.call( obj, prop ) ) {
+							result.push( prop );
+						}
+					}
+					if ( hasDontEnumBug ) {
+						for ( var i = 0; i < dontEnumsLength; i++ ) {
+							if ( hasOwnProperty.call( obj, dontEnums[ i ] ) ) {
+								result.push( dontEnums[ i ] );
+							}
+						}
+					}
+					return result;
+				};
+			}();
+		}
+		// Array extras
+		if ( !Array.prototype.indexOf ) {
+			Array.prototype.indexOf = function( needle, i ) {
+				var len;
+				if ( i === undefined ) {
+					i = 0;
+				}
+				if ( i < 0 ) {
+					i += this.length;
+				}
+				if ( i < 0 ) {
+					i = 0;
+				}
+				for ( len = this.length; i < len; i++ ) {
+					if ( this.hasOwnProperty( i ) && this[ i ] === needle ) {
+						return i;
+					}
+				}
+				return -1;
+			};
+		}
+		if ( !Array.prototype.forEach ) {
+			Array.prototype.forEach = function( callback, context ) {
+				var i, len;
+				for ( i = 0, len = this.length; i < len; i += 1 ) {
+					if ( this.hasOwnProperty( i ) ) {
+						callback.call( context, this[ i ], i, this );
+					}
+				}
+			};
+		}
+		if ( !Array.prototype.map ) {
+			Array.prototype.map = function( mapper, context ) {
+				var array = this,
+					i, len, mapped = [],
+					isActuallyString;
+				// incredibly, if you do something like
+				// Array.prototype.map.call( someString, iterator )
+				// then `this` will become an instance of String in IE8.
+				// And in IE8, you then can't do string[i]. Facepalm.
+				if ( array instanceof String ) {
+					array = array.toString();
+					isActuallyString = true;
+				}
+				for ( i = 0, len = array.length; i < len; i += 1 ) {
+					if ( array.hasOwnProperty( i ) || isActuallyString ) {
+						mapped[ i ] = mapper.call( context, array[ i ], i, array );
+					}
+				}
+				return mapped;
+			};
+		}
+		if ( typeof Array.prototype.reduce !== 'function' ) {
+			Array.prototype.reduce = function( callback, opt_initialValue ) {
+				var i, value, len, valueIsSet;
+				if ( 'function' !== typeof callback ) {
+					throw new TypeError( callback + ' is not a function' );
+				}
+				len = this.length;
+				valueIsSet = false;
+				if ( arguments.length > 1 ) {
+					value = opt_initialValue;
+					valueIsSet = true;
+				}
+				for ( i = 0; i < len; i += 1 ) {
+					if ( this.hasOwnProperty( i ) ) {
+						if ( valueIsSet ) {
+							value = callback( value, this[ i ], i, this );
+						}
+					} else {
+						value = this[ i ];
+						valueIsSet = true;
+					}
+				}
+				if ( !valueIsSet ) {
+					throw new TypeError( 'Reduce of empty array with no initial value' );
+				}
+				return value;
+			};
+		}
+		if ( !Array.prototype.filter ) {
+			Array.prototype.filter = function( filter, context ) {
+				var i, len, filtered = [];
+				for ( i = 0, len = this.length; i < len; i += 1 ) {
+					if ( this.hasOwnProperty( i ) && filter.call( context, this[ i ], i, this ) ) {
+						filtered[ filtered.length ] = this[ i ];
+					}
+				}
+				return filtered;
+			};
+		}
+		if ( typeof Function.prototype.bind !== 'function' ) {
+			Function.prototype.bind = function( context ) {
+				var args, fn, Empty, bound, slice = [].slice;
+				if ( typeof this !== 'function' ) {
+					throw new TypeError( 'Function.prototype.bind called on non-function' );
+				}
+				args = slice.call( arguments, 1 );
+				fn = this;
+				Empty = function() {};
+				bound = function() {
+					var ctx = this instanceof Empty && context ? this : context;
+					return fn.apply( ctx, args.concat( slice.call( arguments ) ) );
+				};
+				Empty.prototype = this.prototype;
+				bound.prototype = new Empty();
+				return bound;
+			};
+		}
+		// https://gist.github.com/Rich-Harris/6010282 via https://gist.github.com/jonathantneal/2869388
+		// addEventListener polyfill IE6+
+		if ( !win.addEventListener ) {
+			( function( win, doc ) {
+				var Event, addEventListener, removeEventListener, head, style, origCreateElement;
+				Event = function( e, element ) {
+					var property, instance = this;
+					for ( property in e ) {
+						instance[ property ] = e[ property ];
+					}
+					instance.currentTarget = element;
+					instance.target = e.srcElement || element;
+					instance.timeStamp = +new Date();
+					instance.preventDefault = function() {
+						e.returnValue = false;
+					};
+					instance.stopPropagation = function() {
+						e.cancelBubble = true;
+					};
+				};
+				addEventListener = function( type, listener ) {
+					var element = this,
+						listeners, i;
+					listeners = element.listeners || ( element.listeners = [] );
+					i = listeners.length;
+					listeners[ i ] = [
+						listener,
+						function( e ) {
+							listener.call( element, new Event( e, element ) );
+						}
+					];
+					element.attachEvent( 'on' + type, listeners[ i ][ 1 ] );
+				};
+				removeEventListener = function( type, listener ) {
+					var element = this,
+						listeners, i;
+					if ( !element.listeners ) {
+						return;
+					}
+					listeners = element.listeners;
+					i = listeners.length;
+					while ( i-- ) {
+						if ( listeners[ i ][ 0 ] === listener ) {
+							element.detachEvent( 'on' + type, listeners[ i ][ 1 ] );
+						}
+					}
+				};
+				win.addEventListener = doc.addEventListener = addEventListener;
+				win.removeEventListener = doc.removeEventListener = removeEventListener;
+				if ( 'Element' in win ) {
+					Element.prototype.addEventListener = addEventListener;
+					Element.prototype.removeEventListener = removeEventListener;
+				} else {
+					// First, intercept any calls to document.createElement - this is necessary
+					// because the CSS hack (see below) doesn't come into play until after a
+					// node is added to the DOM, which is too late for a lot of Ractive setup work
+					origCreateElement = doc.createElement;
+					doc.createElement = function( tagName ) {
+						var el = origCreateElement( tagName );
+						el.addEventListener = addEventListener;
+						el.removeEventListener = removeEventListener;
+						return el;
+					};
+					// Then, mop up any additional elements that weren't created via
+					// document.createElement (i.e. with innerHTML).
+					head = doc.getElementsByTagName( 'head' )[ 0 ];
+					style = doc.createElement( 'style' );
+					head.insertBefore( style, head.firstChild );
+				}
+			}( win, doc ) );
+		}
+		// The getComputedStyle polyfill interacts badly with jQuery, so we don't attach
+		// it to window. Instead, we export it for other modules to use as needed
+		// https://github.com/jonathantneal/Polyfills-for-IE8/blob/master/getComputedStyle.js
+		if ( !win.getComputedStyle ) {
+			exportedShims.getComputedStyle = function() {
+				function getPixelSize( element, style, property, fontSize ) {
+					var sizeWithSuffix = style[ property ],
+						size = parseFloat( sizeWithSuffix ),
+						suffix = sizeWithSuffix.split( /\d/ )[ 0 ],
+						rootSize;
+					fontSize = fontSize != null ? fontSize : /%|em/.test( suffix ) && element.parentElement ? getPixelSize( element.parentElement, element.parentElement.currentStyle, 'fontSize', null ) : 16;
+					rootSize = property == 'fontSize' ? fontSize : /width/i.test( property ) ? element.clientWidth : element.clientHeight;
+					return suffix == 'em' ? size * fontSize : suffix == 'in' ? size * 96 : suffix == 'pt' ? size * 96 / 72 : suffix == '%' ? size / 100 * rootSize : size;
+				}
+
+				function setShortStyleProperty( style, property ) {
+					var borderSuffix = property == 'border' ? 'Width' : '',
+						t = property + 'Top' + borderSuffix,
+						r = property + 'Right' + borderSuffix,
+						b = property + 'Bottom' + borderSuffix,
+						l = property + 'Left' + borderSuffix;
+					style[ property ] = ( style[ t ] == style[ r ] == style[ b ] == style[ l ] ? [ style[ t ] ] : style[ t ] == style[ b ] && style[ l ] == style[ r ] ? [
+						style[ t ],
+						style[ r ]
+					] : style[ l ] == style[ r ] ? [
+						style[ t ],
+						style[ r ],
+						style[ b ]
+					] : [
+						style[ t ],
+						style[ r ],
+						style[ b ],
+						style[ l ]
+					] ).join( ' ' );
+				}
+
+				function CSSStyleDeclaration( element ) {
+					var currentStyle, style, fontSize, property;
+					currentStyle = element.currentStyle;
+					style = this;
+					fontSize = getPixelSize( element, currentStyle, 'fontSize', null );
+					for ( property in currentStyle ) {
+						if ( /width|height|margin.|padding.|border.+W/.test( property ) && style[ property ] !== 'auto' ) {
+							style[ property ] = getPixelSize( element, currentStyle, property, fontSize ) + 'px';
+						} else if ( property === 'styleFloat' ) {
+							style.float = currentStyle[ property ];
+						} else {
+							style[ property ] = currentStyle[ property ];
+						}
+					}
+					setShortStyleProperty( style, 'margin' );
+					setShortStyleProperty( style, 'padding' );
+					setShortStyleProperty( style, 'border' );
+					style.fontSize = fontSize + 'px';
+					return style;
+				}
+				CSSStyleDeclaration.prototype = {
+					constructor: CSSStyleDeclaration,
+					getPropertyPriority: function() {},
+					getPropertyValue: function( prop ) {
+						return this[ prop ] || '';
+					},
+					item: function() {},
+					removeProperty: function() {},
+					setProperty: function() {},
+					getPropertyCSSValue: function() {}
+				};
+
+				function getComputedStyle( element ) {
+					return new CSSStyleDeclaration( element );
+				}
+				return getComputedStyle;
+			}();
+		}
+		return exportedShims;
+	}();
 
 	var config_initOptions = function() {
 
@@ -23930,7 +24247,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var utils_Promise = function() {
 
-		var Promise, PENDING = {}, FULFILLED = {}, REJECTED = {};
+		var Promise, PENDING = {},
+			FULFILLED = {},
+			REJECTED = {};
 		Promise = function( callback ) {
 			var fulfilledHandlers = [],
 				rejectedHandlers = [],
@@ -24165,7 +24484,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var global_css = function( circular, isClient, removeFromArray ) {
 
 		var runloop, styleElement, head, styleSheet, inDom, prefix = '/* Ractive.js component styles */\n',
-			componentsInPage = {}, styles = [];
+			componentsInPage = {},
+			styles = [];
 		if ( !isClient ) {
 			return;
 		}
@@ -24318,7 +24638,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			}
 			// We need both of these - the first enables components to treat data contexts
 			// like lexical scopes in JavaScript functions...
-			if ( hasOwnProperty.call( ractive.data, ref ) ) {
+			if ( hasOwnProperty.call( ractive.data, keys[ 0 ] ) ) {
 				return ref;
 			} else if ( get( ractive, ref ) !== undefined ) {
 				return ref;
@@ -24558,8 +24878,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		} );
 		var runloop, get, set, dirty = false,
 			flushing = false,
-			pendingCssChanges, inFlight = 0,
-			toFocus = null,
+			pendingCssChanges, toFocus = null,
 			liveQueries = [],
 			decorators = [],
 			transitions = [],
@@ -24569,7 +24888,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 			evaluators = [],
 			computations = [],
 			selectValues = [],
-			checkboxKeypaths = {}, checkboxes = [],
+			checkboxKeypaths = {},
+			checkboxes = [],
 			radios = [],
 			unresolved = [],
 			instances = [],
@@ -24578,7 +24898,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 			start: function( instance, callback ) {
 				this.addInstance( instance );
 				if ( !flushing ) {
-					inFlight += 1;
 					// create a new transition manager
 					transitionManager = makeTransitionManager( callback, transitionManager );
 				}
@@ -24588,24 +24907,20 @@ define('collections', ['underscore', 'backbone', 'models'],
 					attemptKeypathResolution();
 					return;
 				}
-				if ( !--inFlight ) {
-					flushing = true;
-					flushChanges();
-					flushing = false;
-					land();
-				}
+				flushing = true;
+				flushChanges();
+				flushing = false;
 				transitionManager.init();
 				transitionManager = transitionManager._previous;
 			},
 			trigger: function() {
-				if ( inFlight || flushing ) {
+				if ( flushing ) {
 					attemptKeypathResolution();
 					return;
 				}
 				flushing = true;
 				flushChanges();
 				flushing = false;
-				land();
 			},
 			focus: function( node ) {
 				toFocus = node;
@@ -24639,7 +24954,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			},
 			scheduleCssUpdate: function() {
 				// if runloop isn't currently active, we need to trigger change immediately
-				if ( !inFlight && !flushing ) {
+				if ( !flushing ) {
 					// TODO does this ever happen?
 					css.update();
 				} else {
@@ -24684,8 +24999,39 @@ define('collections', ['underscore', 'backbone', 'models'],
 		circular.runloop = runloop;
 		return runloop;
 
-		function land() {
-			var thing, changedKeypath, changeHash;
+		function flushChanges() {
+			var thing, upstreamChanges, i, changeHash, changedKeypath;
+			i = instances.length;
+			while ( i-- ) {
+				thing = instances[ i ];
+				if ( thing._changes.length ) {
+					upstreamChanges = getUpstreamChanges( thing._changes );
+					notifyDependants.multiple( thing, upstreamChanges, true );
+				}
+			}
+			attemptKeypathResolution();
+			// These changes may have knock-on effects, so we need to keep
+			// looping until the system is settled
+			while ( dirty ) {
+				dirty = false;
+				while ( thing = computations.pop() ) {
+					thing.update();
+				}
+				while ( thing = evaluators.pop() ) {
+					thing.update().deferred = false;
+				}
+				while ( thing = selectValues.pop() ) {
+					thing.deferredUpdate();
+				}
+				while ( thing = checkboxes.pop() ) {
+					set( thing.root, thing.keypath, getValueFromCheckboxes( thing.root, thing.keypath ) );
+				}
+				while ( thing = radios.pop() ) {
+					thing.update();
+				}
+			}
+			// Now that changes have been fully propagated, we can update the DOM
+			// and complete other tasks
 			if ( toFocus ) {
 				toFocus.focus();
 				toFocus = null;
@@ -24722,37 +25068,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 			if ( pendingCssChanges ) {
 				css.update();
 				pendingCssChanges = false;
-			}
-		}
-
-		function flushChanges() {
-			var thing, upstreamChanges, i;
-			i = instances.length;
-			while ( i-- ) {
-				thing = instances[ i ];
-				if ( thing._changes.length ) {
-					upstreamChanges = getUpstreamChanges( thing._changes );
-					notifyDependants.multiple( thing, upstreamChanges, true );
-				}
-			}
-			attemptKeypathResolution();
-			while ( dirty ) {
-				dirty = false;
-				while ( thing = computations.pop() ) {
-					thing.update();
-				}
-				while ( thing = evaluators.pop() ) {
-					thing.update().deferred = false;
-				}
-				while ( thing = selectValues.pop() ) {
-					thing.deferredUpdate();
-				}
-				while ( thing = checkboxes.pop() ) {
-					set( thing.root, thing.keypath, getValueFromCheckboxes( thing.root, thing.keypath ) );
-				}
-				while ( thing = radios.pop() ) {
-					thing.update();
-				}
 			}
 		}
 
@@ -25490,7 +25805,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 
 		function prefixKeypath( obj, prefix ) {
-			var prefixed = {}, key;
+			var prefixed = {},
+				key;
 			if ( !prefix ) {
 				return obj;
 			}
@@ -25812,7 +26128,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 		var toString = Object.prototype.toString;
 		return function( thing ) {
-			return typeof thing === 'object' && toString.call( thing ) === '[object Object]';
+			return thing && toString.call( thing ) === '[object Object]';
 		};
 	}();
 
@@ -26024,7 +26340,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var Ractive_prototype_animate__animate = function( isEqual, Promise, normaliseKeypath, animations, get, Animation ) {
 
-		var noop = function() {}, noAnimation = {
+		var noop = function() {},
+			noAnimation = {
 				stop: noop
 			};
 		return function( keypath, to, options ) {
@@ -26405,12 +26722,12 @@ define('collections', ['underscore', 'backbone', 'models'],
 				// Either return the exact same query, or (if not live) a snapshot
 				return options && options.live ? query : query.slice();
 			}
-			query = makeQuery( this, selector, !! options.live, false );
+			query = makeQuery( this, selector, !!options.live, false );
 			// Add this to the list of live queries Ractive needs to maintain,
 			// if applicable
 			if ( query.live ) {
 				liveQueries.push( selector );
-				liveQueries[ selector ] = query;
+				liveQueries[ '_' + selector ] = query;
 			}
 			this.fragment.findAll( selector, query );
 			return query;
@@ -26429,12 +26746,12 @@ define('collections', ['underscore', 'backbone', 'models'],
 				// Either return the exact same query, or (if not live) a snapshot
 				return options && options.live ? query : query.slice();
 			}
-			query = makeQuery( this, selector, !! options.live, true );
+			query = makeQuery( this, selector, !!options.live, true );
 			// Add this to the list of live queries Ractive needs to maintain,
 			// if applicable
 			if ( query.live ) {
 				liveQueries.push( selector );
-				liveQueries[ selector ] = query;
+				liveQueries[ '_' + selector ] = query;
 			}
 			this.fragment.findAllComponents( selector, query );
 			return query;
@@ -26508,10 +26825,16 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( utils_normaliseKeypath, shared_get__get, shared_get_UnresolvedImplicitDependency );
 
-	var utils_getElement = function( input ) {
+	var utils_getElement = function getElement( input ) {
 		var output;
+		if ( !input ) {
+			return;
+		}
 		if ( typeof window === 'undefined' || !document || !input ) {
 			return null;
+		}
+		if ( input.target ) {
+			return getElement( input.target );
 		}
 		// We already have a DOM node - no work to do. (Duck typing alert!)
 		if ( input.nodeType ) {
@@ -27145,11 +27468,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var render_shared_Fragment_reassign = function( assignNewKeypath ) {
 
 		return function reassignFragment( indexRef, newIndex, oldKeypath, newKeypath ) {
-			// If this fragment was rendered with innerHTML, we have nothing to do
-			// TODO a less hacky way of determining this
-			if ( this.html !== undefined ) {
-				return;
-			}
 			// assign new context keypath if needed
 			assignNewKeypath( this, 'context', oldKeypath, newKeypath );
 			if ( this.indexRefs && this.indexRefs[ indexRef ] !== undefined && this.indexRefs[ indexRef ] !== newIndex ) {
@@ -27168,65 +27486,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 			reassign: reassign
 		};
 	}( render_shared_Fragment_initialise, render_shared_Fragment_reassign );
-
-	var render_DomFragment_shared_insertHtml = function( namespaces, createElement ) {
-
-		var elementCache = {}, ieBug, ieBlacklist;
-		try {
-			createElement( 'table' ).innerHTML = 'foo';
-		} catch ( err ) {
-			ieBug = true;
-			ieBlacklist = {
-				TABLE: [
-					'<table class="x">',
-					'</table>'
-				],
-				THEAD: [
-					'<table><thead class="x">',
-					'</thead></table>'
-				],
-				TBODY: [
-					'<table><tbody class="x">',
-					'</tbody></table>'
-				],
-				TR: [
-					'<table><tr class="x">',
-					'</tr></table>'
-				],
-				SELECT: [
-					'<select class="x">',
-					'</select>'
-				]
-			};
-		}
-		return function( html, tagName, namespace, docFrag ) {
-			var container, nodes = [],
-				wrapper;
-			if ( html ) {
-				if ( ieBug && ( wrapper = ieBlacklist[ tagName ] ) ) {
-					container = element( 'DIV' );
-					container.innerHTML = wrapper[ 0 ] + html + wrapper[ 1 ];
-					container = container.querySelector( '.x' );
-				} else if ( namespace === namespaces.svg ) {
-					container = element( 'DIV' );
-					container.innerHTML = '<svg class="x">' + html + '</svg>';
-					container = container.querySelector( '.x' );
-				} else {
-					container = element( tagName );
-					container.innerHTML = html;
-				}
-				while ( container.firstChild ) {
-					nodes.push( container.firstChild );
-					docFrag.appendChild( container.firstChild );
-				}
-			}
-			return nodes;
-		};
-
-		function element( tagName ) {
-			return elementCache[ tagName ] || ( elementCache[ tagName ] = createElement( tagName ) );
-		}
-	}( config_namespaces, utils_createElement );
 
 	var render_DomFragment_shared_detach = function() {
 		var node = this.node,
@@ -27312,7 +27571,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			this.type = types.REFERENCE;
 			this.priority = priority;
 			value = root.get( keypath );
-			if ( typeof value === 'function' ) {
+			if ( typeof value === 'function' && !value._nowrap ) {
 				value = wrapFunction( value, root, evaluator );
 			}
 			this.value = evaluator.values[ argNum ] = value;
@@ -27582,7 +27841,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					return;
 				}
 				// Couldn't resolve yet
-				args[ i ] = undefined;
+				args[ i ] = null;
 				expressionResolver.pending += 1;
 				unresolved = new Unresolved( ractive, reference, parentFragment, function( keypath ) {
 					expressionResolver.resolve( i, keypath );
@@ -27636,6 +27895,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 				var changed;
 				this.args.forEach( function( arg ) {
 					var changedKeypath;
+					if ( !arg )
+						return;
 					if ( arg.keypath && ( changedKeypath = getNewKeypath( arg.keypath, oldKeypath, newKeypath ) ) ) {
 						arg.keypath = changedKeypath;
 						changed = true;
@@ -27805,7 +28066,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var render_shared_Mustache_initialise = function( runloop, resolveRef, KeypathExpressionResolver, ExpressionResolver ) {
 
 		return function initMustache( mustache, options ) {
-			var ref, keypath, indexRefs, index, parentFragment, descriptor, resolve;
+			var ref, indexRefs, index, parentFragment, descriptor;
 			parentFragment = options.parentFragment;
 			descriptor = options.descriptor;
 			mustache.root = parentFragment.root;
@@ -27814,9 +28075,20 @@ define('collections', ['underscore', 'backbone', 'models'],
 			mustache.index = options.index || 0;
 			mustache.priority = parentFragment.priority;
 			mustache.type = options.descriptor.t;
-			resolve = function( keypath ) {
+
+			function resolve( keypath ) {
 				mustache.resolve( keypath );
-			};
+			}
+
+			function resolveWithRef( ref ) {
+				var keypath = resolveRef( mustache.root, ref, mustache.parentFragment );
+				if ( keypath !== undefined ) {
+					resolve( keypath );
+				} else {
+					mustache.ref = ref;
+					runloop.addUnresolved( mustache );
+				}
+			}
 			// if this is a simple mustache, with a reference, we just need to resolve
 			// the reference to a keypath
 			if ( ref = descriptor.r ) {
@@ -27826,13 +28098,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					mustache.value = index;
 					mustache.render( mustache.value );
 				} else {
-					keypath = resolveRef( mustache.root, ref, mustache.parentFragment );
-					if ( keypath !== undefined ) {
-						resolve( keypath );
-					} else {
-						mustache.ref = ref;
-						runloop.addUnresolved( mustache );
-					}
+					resolveWithRef( ref );
 				}
 			}
 			// if it's an expression, we have a bit more work to do
@@ -27840,7 +28106,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				mustache.resolver = new ExpressionResolver( mustache, parentFragment, options.descriptor.x, resolve );
 			}
 			if ( options.descriptor.kx ) {
-				mustache.resolver = new KeypathExpressionResolver( mustache, options.descriptor.kx, resolve );
+				mustache.resolver = new KeypathExpressionResolver( mustache, options.descriptor.kx, resolveWithRef );
 			}
 			// Special case - inverted sections
 			if ( mustache.descriptor.n && !mustache.hasOwnProperty( 'value' ) ) {
@@ -27866,7 +28132,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var render_shared_Mustache_resolve = function( types, registerDependant, unregisterDependant ) {
 
 		return function resolveMustache( keypath ) {
-			var i;
+			var reassignTarget;
 			// In some cases, we may resolve to the same keypath (if this is
 			// an expression mustache that was reassigned due to an ancestor's
 			// keypath) - in which case, this is a no-op
@@ -27876,14 +28142,16 @@ define('collections', ['underscore', 'backbone', 'models'],
 			// if we resolved previously, we need to unregister
 			if ( this.registered ) {
 				unregisterDependant( this );
-				// is this a section? if so, we may have children that need
-				// to be reassigned
-				// TODO only DOM sections?
-				if ( this.type === types.SECTION ) {
-					i = this.fragments.length;
-					while ( i-- ) {
-						this.fragments[ i ].reassign( null, null, this.keypath, keypath );
-					}
+				//need to reassign the element, if this belongs to one, for keypath changes
+				if ( this.parentFragment && this.parentFragment.owner && this.parentFragment.owner.element ) {
+					reassignTarget = this.parentFragment.owner.element;
+				} else {
+					reassignTarget = this;
+				}
+				reassignTarget.reassign( null, null, this.keypath, keypath );
+				//if we already updated due to reassignent, we can exit
+				if ( keypath === this.keypath ) {
+					return;
 				}
 			}
 			this.keypath = keypath;
@@ -27899,7 +28167,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 			// expression mustache?
 			if ( this.resolver ) {
 				this.resolver.reassign( indexRef, newIndex, oldKeypath, newKeypath );
-			} else if ( this.keypath ) {
+			}
+			// normal keypath mustache or keypath expression?
+			if ( this.keypath ) {
 				updated = getNewKeypath( this.keypath, oldKeypath, newKeypath );
 				// was a new keypath created?
 				if ( updated ) {
@@ -27973,78 +28243,71 @@ define('collections', ['underscore', 'backbone', 'models'],
 		return DomInterpolator;
 	}( config_types, shared_teardown, render_shared_Mustache__Mustache, render_DomFragment_shared_detach );
 
-	var render_DomFragment_Section_prototype_merge = function() {
-
-		var toTeardown = [];
-		return function sectionMerge( newIndices ) {
-			var section = this,
-				parentFragment, firstChange, i, newLength, reassignedFragments, fragmentOptions, fragment, nextNode;
-			parentFragment = this.parentFragment;
-			reassignedFragments = [];
-			// first, reassign existing fragments
-			newIndices.forEach( function reassignIfNecessary( newIndex, oldIndex ) {
-				var fragment, by, oldKeypath, newKeypath;
-				if ( newIndex === oldIndex ) {
-					reassignedFragments[ newIndex ] = section.fragments[ oldIndex ];
-					return;
-				}
-				if ( firstChange === undefined ) {
-					firstChange = oldIndex;
-				}
-				// does this fragment need to be torn down?
-				if ( newIndex === -1 ) {
-					toTeardown.push( section.fragments[ oldIndex ] );
-					return;
-				}
-				// Otherwise, it needs to be reassigned to a new index
-				fragment = section.fragments[ oldIndex ];
-				by = newIndex - oldIndex;
-				oldKeypath = section.keypath + '.' + oldIndex;
-				newKeypath = section.keypath + '.' + newIndex;
-				fragment.reassign( section.descriptor.i, oldIndex, newIndex, by, oldKeypath, newKeypath );
-				reassignedFragments[ newIndex ] = fragment;
-			} );
-			while ( fragment = toTeardown.pop() ) {
-				fragment.teardown( true );
-			}
-			// If nothing changed with the existing fragments, then we start adding
-			// new fragments at the end...
-			if ( firstChange === undefined ) {
-				firstChange = this.length;
-			}
-			this.length = newLength = this.root.get( this.keypath ).length;
-			if ( newLength === firstChange ) {
-				// ...unless there are no new fragments to add
+	var render_DomFragment_Section_prototype_merge = function sectionMerge( newIndices ) {
+		var section = this,
+			parentFragment, firstChange, i, newLength, reassignedFragments, fragmentOptions, fragment, nextNode;
+		parentFragment = this.parentFragment;
+		reassignedFragments = [];
+		// first, reassign existing fragments
+		newIndices.forEach( function reassignIfNecessary( newIndex, oldIndex ) {
+			var fragment, by, oldKeypath, newKeypath;
+			if ( newIndex === oldIndex ) {
+				reassignedFragments[ newIndex ] = section.fragments[ oldIndex ];
 				return;
 			}
-			// Prepare new fragment options
-			fragmentOptions = {
-				descriptor: this.descriptor.f,
-				root: this.root,
-				pNode: parentFragment.pNode,
-				owner: this
-			};
-			if ( this.descriptor.i ) {
-				fragmentOptions.indexRef = this.descriptor.i;
+			if ( firstChange === undefined ) {
+				firstChange = oldIndex;
 			}
-			// Add as many new fragments as we need to, or add back existing
-			// (detached) fragments
-			for ( i = firstChange; i < newLength; i += 1 ) {
-				// is this an existing fragment?
-				if ( fragment = reassignedFragments[ i ] ) {
-					this.docFrag.appendChild( fragment.detach( false ) );
-				} else {
-					fragmentOptions.context = this.keypath + '.' + i;
-					fragmentOptions.index = i;
-					fragment = this.createFragment( fragmentOptions );
-				}
-				this.fragments[ i ] = fragment;
+			// does this fragment need to be torn down?
+			if ( newIndex === -1 ) {
+				section.fragments[ oldIndex ].teardown( true );
+				return;
 			}
-			// reinsert fragment
-			nextNode = parentFragment.findNextNode( this );
-			parentFragment.pNode.insertBefore( this.docFrag, nextNode );
+			// Otherwise, it needs to be reassigned to a new index
+			fragment = section.fragments[ oldIndex ];
+			by = newIndex - oldIndex;
+			oldKeypath = section.keypath + '.' + oldIndex;
+			newKeypath = section.keypath + '.' + newIndex;
+			fragment.reassign( section.descriptor.i, newIndex, oldKeypath, newKeypath );
+			reassignedFragments[ newIndex ] = fragment;
+		} );
+		// If nothing changed with the existing fragments, then we start adding
+		// new fragments at the end...
+		if ( firstChange === undefined ) {
+			firstChange = this.length;
+		}
+		this.length = newLength = this.root.get( this.keypath ).length;
+		if ( newLength === firstChange ) {
+			// ...unless there are no new fragments to add
+			return;
+		}
+		// Prepare new fragment options
+		fragmentOptions = {
+			descriptor: this.descriptor.f,
+			root: this.root,
+			pNode: parentFragment.pNode,
+			owner: this
 		};
-	}();
+		if ( this.descriptor.i ) {
+			fragmentOptions.indexRef = this.descriptor.i;
+		}
+		// Add as many new fragments as we need to, or add back existing
+		// (detached) fragments
+		for ( i = firstChange; i < newLength; i += 1 ) {
+			// is this an existing fragment?
+			if ( fragment = reassignedFragments[ i ] ) {
+				this.docFrag.appendChild( fragment.detach( false ) );
+			} else {
+				fragmentOptions.context = this.keypath + '.' + i;
+				fragmentOptions.index = i;
+				fragment = this.createFragment( fragmentOptions );
+			}
+			this.fragments[ i ] = fragment;
+		}
+		// reinsert fragment
+		nextNode = parentFragment.findNextNode( this );
+		parentFragment.pNode.insertBefore( this.docFrag, nextNode );
+	};
 
 	var render_shared_updateSection = function( isArray, isObject ) {
 
@@ -28272,6 +28535,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				descriptor: section.descriptor.f,
 				root: section.root,
 				pNode: section.parentFragment.pNode,
+				pElement: section.pElement,
 				owner: section,
 				indexRef: section.descriptor.i
 			};
@@ -28297,7 +28561,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 		// Section
 		DomSection = function( options, docFrag ) {
 			this.type = types.SECTION;
-			this.inverted = !! options.descriptor.n;
+			this.inverted = !!options.descriptor.n;
+			this.pElement = options.pElement;
 			this.fragments = [];
 			this.length = 0;
 			// number of times this section is rendered
@@ -28404,6 +28669,66 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 		return DomSection;
 	}( config_types, render_shared_Mustache__Mustache, render_DomFragment_Section_prototype_merge, render_DomFragment_Section_prototype_render, render_DomFragment_Section_prototype_splice, shared_teardown, circular );
+
+	var render_DomFragment_shared_insertHtml = function( namespaces, createElement ) {
+
+		var elementCache = {},
+			ieBug, ieBlacklist;
+		try {
+			createElement( 'table' ).innerHTML = 'foo';
+		} catch ( err ) {
+			ieBug = true;
+			ieBlacklist = {
+				TABLE: [
+					'<table class="x">',
+					'</table>'
+				],
+				THEAD: [
+					'<table><thead class="x">',
+					'</thead></table>'
+				],
+				TBODY: [
+					'<table><tbody class="x">',
+					'</tbody></table>'
+				],
+				TR: [
+					'<table><tr class="x">',
+					'</tr></table>'
+				],
+				SELECT: [
+					'<select class="x">',
+					'</select>'
+				]
+			};
+		}
+		return function( html, tagName, namespace, docFrag ) {
+			var container, nodes = [],
+				wrapper;
+			if ( html ) {
+				if ( ieBug && ( wrapper = ieBlacklist[ tagName ] ) ) {
+					container = element( 'DIV' );
+					container.innerHTML = wrapper[ 0 ] + html + wrapper[ 1 ];
+					container = container.querySelector( '.x' );
+				} else if ( namespace === namespaces.svg ) {
+					container = element( 'DIV' );
+					container.innerHTML = '<svg class="x">' + html + '</svg>';
+					container = container.querySelector( '.x' );
+				} else {
+					container = element( tagName );
+					container.innerHTML = html;
+				}
+				while ( container.firstChild ) {
+					nodes.push( container.firstChild );
+					docFrag.appendChild( container.firstChild );
+				}
+			}
+			return nodes;
+		};
+
+		function element( tagName ) {
+			return elementCache[ tagName ] || ( elementCache[ tagName ] = createElement( tagName ) );
+		}
+	}( config_namespaces, utils_createElement );
 
 	var render_DomFragment_Triple = function( types, matches, Mustache, insertHtml, teardown ) {
 
@@ -28535,7 +28860,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 		svgCamelCaseElements = 'altGlyph altGlyphDef altGlyphItem animateColor animateMotion animateTransform clipPath feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence foreignObject glyphRef linearGradient radialGradient textPath vkern'.split( ' ' );
 		svgCamelCaseAttributes = 'attributeName attributeType baseFrequency baseProfile calcMode clipPathUnits contentScriptType contentStyleType diffuseConstant edgeMode externalResourcesRequired filterRes filterUnits glyphRef gradientTransform gradientUnits kernelMatrix kernelUnitLength keyPoints keySplines keyTimes lengthAdjust limitingConeAngle markerHeight markerUnits markerWidth maskContentUnits maskUnits numOctaves pathLength patternContentUnits patternTransform patternUnits pointsAtX pointsAtY pointsAtZ preserveAlpha preserveAspectRatio primitiveUnits refX refY repeatCount repeatDur requiredExtensions requiredFeatures specularConstant specularExponent spreadMethod startOffset stdDeviation stitchTiles surfaceScale systemLanguage tableValues targetX targetY textLength viewBox viewTarget xChannelSelector yChannelSelector zoomAndPan'.split( ' ' );
 		createMap = function( items ) {
-			var map = {}, i = items.length;
+			var map = {},
+				i = items.length;
 			while ( i-- ) {
 				map[ items[ i ].toLowerCase() ] = items[ i ];
 			}
@@ -28579,7 +28905,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var render_DomFragment_Attribute_helpers_setStaticAttribute = function( namespaces ) {
 
 		return function setStaticAttribute( attribute, options ) {
-			var node, value = options.value === null ? '' : options.value;
+			var node, value = options.value || '';
 			if ( node = options.pNode ) {
 				if ( attribute.namespace ) {
 					node.setAttributeNS( attribute.namespace, options.name, value );
@@ -28600,7 +28926,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					node._ractive.value = options.value;
 				}
 			}
-			attribute.value = options.value;
+			attribute.value = options.value || null;
 		};
 	}( config_namespaces );
 
@@ -28715,6 +29041,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			// be explicit when using two-way data-binding about what keypath you're
 			// updating. Using it in lists is probably a recipe for confusion...
 			if ( !interpolator.keypath ) {
+				//TODO: What about kx?
 				interpolator.resolve( interpolator.descriptor.r );
 			}
 			this.keypath = interpolator.keypath;
@@ -28925,7 +29252,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 		CheckboxNameBinding.prototype = {
 			changed: function() {
-				return this.node.checked !== !! this.checked;
+				return this.node.checked !== !!this.checked;
 			},
 			update: function() {
 				this.checked = this.node.checked;
@@ -29481,7 +29808,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				if ( stringLiteral && ( values = this.values ) ) {
 					return {
 						v: stringLiteral.v.replace( placeholderPattern, function( match, $1 ) {
-							return values[ $1 ] || $1;
+							return $1 in values ? values[ $1 ] : $1;
 						} )
 					};
 				}
@@ -29515,6 +29842,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				result = [];
 				while ( valueToken = this.getToken() ) {
 					result.push( valueToken.v );
+					this.allowWhitespace();
 					if ( this.getStringMatch( ']' ) ) {
 						return {
 							v: result
@@ -29663,55 +29991,67 @@ define('collections', ['underscore', 'backbone', 'models'],
 		return StringText;
 	}( config_types );
 
-	var render_StringFragment_prototype_toArgsList = function( warn, parseJSON ) {
+	var render_StringFragment_prototype_getValue = function( types, warn, parseJSON ) {
 
-		return function() {
-			var values, counter, jsonesque, guid, errorMessage, parsed, processItems;
-			if ( !this.argsList || this.dirty ) {
-				values = {};
-				counter = 0;
-				guid = this.root._guid;
-				processItems = function( items ) {
-					return items.map( function( item ) {
-						var placeholderId, wrapped, value;
-						if ( item.text ) {
-							return item.text;
-						}
-						if ( item.fragments ) {
-							return item.fragments.map( function( fragment ) {
-								return processItems( fragment.items );
-							} ).join( '' );
-						}
-						placeholderId = guid + '-' + counter++;
-						if ( wrapped = item.root._wrapped[ item.keypath ] ) {
-							value = wrapped.value;
-						} else {
-							value = item.value;
-						}
-						values[ placeholderId ] = value;
-						return '${' + placeholderId + '}';
-					} ).join( '' );
-				};
-				jsonesque = processItems( this.items );
-				parsed = parseJSON( '[' + jsonesque + ']', values );
-				if ( !parsed ) {
-					errorMessage = 'Could not parse directive arguments (' + this.toString() + '). If you think this is a bug, please file an issue at http://github.com/RactiveJS/Ractive/issues';
-					if ( this.root.debug ) {
-						throw new Error( errorMessage );
-					} else {
-						warn( errorMessage );
-						this.argsList = [ jsonesque ];
+		var onlyWhitespace = /^\s*$/,
+			empty = {};
+		return function StringFragment$getValue( options ) {
+			var asArgs, parse, value, values, jsonesque, parsed, cache, dirtyFlag, result;
+			options = options || empty;
+			asArgs = options.args;
+			parse = asArgs || options.parse;
+			cache = asArgs ? 'argsList' : 'value';
+			dirtyFlag = asArgs ? 'dirtyArgs' : 'dirtyValue';
+			if ( this[ dirtyFlag ] || !this.hasOwnProperty( cache ) ) {
+				// Fast path
+				if ( this.items.length === 1 && this.items[ 0 ].type === types.INTERPOLATOR ) {
+					value = this.items[ 0 ].value;
+					if ( value !== undefined ) {
+						result = asArgs ? [ value ] : value;
 					}
 				} else {
-					this.argsList = parsed.value;
+					if ( parse ) {
+						values = {};
+						jsonesque = processItems( this.items, values, this.root._guid );
+						parsed = parseJSON( asArgs ? '[' + jsonesque + ']' : jsonesque, values );
+					}
+					if ( !parsed || !onlyWhitespace.test( parsed.remaining ) ) {
+						result = asArgs ? [ this.toString() ] : this.toString();
+					} else {
+						result = parsed.value;
+					}
 				}
-				this.dirty = false;
+				this[ cache ] = result;
+				this[ dirtyFlag ] = false;
 			}
-			return this.argsList;
+			return this[ cache ];
 		};
-	}( utils_warn, utils_parseJSON );
 
-	var render_StringFragment__StringFragment = function( types, parseJSON, Fragment, Interpolator, Section, Text, toArgsList, circular ) {
+		function processItems( items, values, guid, counter ) {
+			counter = counter || 0;
+			return items.map( function( item ) {
+				var placeholderId, wrapped, value;
+				if ( item.text ) {
+					return item.text;
+				}
+				if ( item.fragments ) {
+					return item.fragments.map( function( fragment ) {
+						return processItems( fragment.items, values, guid, counter );
+					} ).join( '' );
+				}
+				placeholderId = guid + '-' + counter++;
+				if ( wrapped = item.root._wrapped[ item.keypath ] ) {
+					value = wrapped.value;
+				} else {
+					value = item.value;
+				}
+				values[ placeholderId ] = value;
+				return '${' + placeholderId + '}';
+			} ).join( '' );
+		}
+	}( config_types, utils_warn, utils_parseJSON );
+
+	var render_StringFragment__StringFragment = function( types, parseJSON, Fragment, Interpolator, Section, Text, getValue, circular ) {
 
 		var StringFragment = function( options ) {
 			Fragment.init( this, options );
@@ -29734,7 +30074,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				}
 			},
 			bubble: function() {
-				this.dirty = true;
+				this.dirtyValue = this.dirtyArgs = true;
 				this.owner.bubble();
 			},
 			teardown: function() {
@@ -29744,17 +30084,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					this.items[ i ].teardown();
 				}
 			},
-			getValue: function() {
-				var value;
-				// Accommodate boolean attributes
-				if ( this.items.length === 1 && this.items[ 0 ].type === types.INTERPOLATOR ) {
-					value = this.items[ 0 ].value;
-					if ( value !== undefined ) {
-						return value;
-					}
-				}
-				return this.toString();
-			},
+			getValue: getValue,
 			isSimple: function() {
 				var i, item, containsInterpolator;
 				if ( this.simple !== undefined ) {
@@ -29792,22 +30122,24 @@ define('collections', ['underscore', 'backbone', 'models'],
 					value = parsed ? parsed.value : value;
 				}
 				return value;
-			},
-			toArgsList: toArgsList
+			}
 		};
 		circular.StringFragment = StringFragment;
 		return StringFragment;
-	}( config_types, utils_parseJSON, render_shared_Fragment__Fragment, render_StringFragment_Interpolator, render_StringFragment_Section, render_StringFragment_Text, render_StringFragment_prototype_toArgsList, circular );
+	}( config_types, utils_parseJSON, render_shared_Fragment__Fragment, render_StringFragment_Interpolator, render_StringFragment_Section, render_StringFragment_Text, render_StringFragment_prototype_getValue, circular );
 
 	var render_DomFragment_Attribute__Attribute = function( runloop, types, determineNameAndNamespace, setStaticAttribute, determinePropertyName, getInterpolator, bind, update, StringFragment ) {
 
-		var DomAttribute = function( options ) {
+		var DomAttribute, booleanAttributes;
+		// via https://github.com/kangax/html-minifier/issues/63#issuecomment-37763316
+		booleanAttributes = /allowFullscreen|async|autofocus|autoplay|checked|compact|controls|declare|default|defaultChecked|defaultMuted|defaultSelected|defer|disabled|draggable|enabled|formNoValidate|hidden|indeterminate|inert|isMap|itemScope|loop|multiple|muted|noHref|noResize|noShade|noValidate|noWrap|open|pauseOnExit|readOnly|required|reversed|scoped|seamless|selected|sortable|spellcheck|translate|trueSpeed|typeMustMatch|visible/;
+		DomAttribute = function( options ) {
 			this.type = types.ATTRIBUTE;
 			this.element = options.element;
 			determineNameAndNamespace( this, options.name );
 			// if it's an empty attribute, or just a straight key-value pair, with no
 			// mustache shenanigans, set the attribute accordingly and go home
-			if ( options.value === null || typeof options.value === 'string' ) {
+			if ( !options.value || typeof options.value === 'string' ) {
 				setStaticAttribute( this, options );
 				return;
 			}
@@ -29892,7 +30224,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				}
 			},
 			toString: function() {
-				var str, interpolator;
+				var escaped, interpolator;
 				if ( this.value === null ) {
 					return this.name;
 				}
@@ -29904,15 +30236,24 @@ define('collections', ['underscore', 'backbone', 'models'],
 				if ( this.name === 'name' && this.element.lcName === 'input' && ( interpolator = this.interpolator ) ) {
 					return 'name={{' + ( interpolator.keypath || interpolator.ref ) + '}}';
 				}
-				// TODO don't use JSON.stringify?
-				if ( !this.fragment ) {
-					return this.name + '=' + JSON.stringify( this.value );
+				// Special case - boolean attributes
+				if ( this.fragment && booleanAttributes.test( this.name ) ) {
+					return this.fragment.getValue() ? this.name : null;
 				}
-				// TODO deal with boolean attributes correctly
-				str = this.fragment.toString();
-				return this.name + '=' + JSON.stringify( str );
+				if ( this.fragment ) {
+					escaped = escape( this.fragment.toString() );
+				} else {
+					escaped = escape( this.value );
+				}
+				//TODO: What was Rich's itent in this line? Adding in quotes to make tests pass
+				//return this.name + '=' + ( escaped.indexOf( ' ' ) !== -1 ? '"' + escaped + '"' : escaped );
+				return this.name + '=' + '"' + escaped + '"';
 			}
 		};
+
+		function escape( string ) {
+			return string.replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /'/g, '&#39;' );
+		}
 		return DomAttribute;
 	}( global_runloop, config_types, render_DomFragment_Attribute_helpers_determineNameAndNamespace, render_DomFragment_Attribute_helpers_setStaticAttribute, render_DomFragment_Attribute_helpers_determinePropertyName, render_DomFragment_Attribute_helpers_getInterpolator, render_DomFragment_Attribute_prototype_bind, render_DomFragment_Attribute_prototype_update, render_StringFragment__StringFragment );
 
@@ -29953,26 +30294,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( render_DomFragment_Element_initialise_createElementAttribute );
 
-	var utils_toArray = function toArray( arrayLike ) {
-		var array = [],
-			i = arrayLike.length;
-		while ( i-- ) {
-			array[ i ] = arrayLike[ i ];
-		}
-		return array;
-	};
-
-	var render_DomFragment_Element_shared_getMatchingStaticNodes = function( toArray ) {
-
-		return function getMatchingStaticNodes( element, selector ) {
-			if ( !element.matchingStaticNodes[ selector ] ) {
-				element.matchingStaticNodes[ selector ] = toArray( element.node.querySelectorAll( selector ) );
-			}
-			return element.matchingStaticNodes[ selector ];
-		};
-	}( utils_toArray );
-
-	var render_DomFragment_Element_initialise_appendElementChildren = function( warn, namespaces, StringFragment, getMatchingStaticNodes, circular ) {
+	var render_DomFragment_Element_initialise_appendElementChildren = function( circular, warn, namespaces, StringFragment ) {
 
 		var DomFragment, updateCss, updateScript;
 		circular.push( function() {
@@ -29984,7 +30306,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 			if ( node.styleSheet ) {
 				node.styleSheet.cssText = content;
 			} else {
-				node.innerHTML = content;
+				while ( node.hasChildNodes() ) {
+					node.removeChild( node.firstChild );
+				}
+				node.appendChild( document.createTextNode( content ) );
 			}
 		};
 		updateScript = function() {
@@ -30012,50 +30337,26 @@ define('collections', ['underscore', 'backbone', 'models'],
 				}
 				return;
 			}
-			if ( typeof descriptor.f === 'string' && ( !node || ( !node.namespaceURI || node.namespaceURI === namespaces.html ) ) ) {
-				// great! we can use innerHTML
-				element.html = descriptor.f;
-				if ( docFrag ) {
-					node.innerHTML = element.html;
-					// Update live queries, if applicable
-					element.matchingStaticNodes = {};
-					// so we can remove matches made with querySelectorAll at teardown time
-					updateLiveQueries( element );
-				}
-			} else {
-				element.fragment = new DomFragment( {
-					descriptor: descriptor.f,
-					root: element.root,
-					pNode: node,
-					owner: element,
-					pElement: element
-				} );
-				if ( docFrag ) {
-					node.appendChild( element.fragment.docFrag );
-				}
+			element.fragment = new DomFragment( {
+				descriptor: descriptor.f,
+				root: element.root,
+				pNode: node,
+				owner: element,
+				pElement: element
+			} );
+			if ( docFrag ) {
+				node.appendChild( element.fragment.docFrag );
 			}
 		};
-
-		function updateLiveQueries( element ) {
-			var instance, liveQueries, node, selector, query, matchingStaticNodes, i;
-			node = element.node;
-			instance = element.root;
-			do {
-				liveQueries = instance._liveQueries;
-				i = liveQueries.length;
-				while ( i-- ) {
-					selector = liveQueries[ i ];
-					query = liveQueries[ selector ];
-					matchingStaticNodes = getMatchingStaticNodes( element, selector );
-					query.push.apply( query, matchingStaticNodes );
-				}
-			} while ( instance = instance._parent );
-		}
-	}( utils_warn, config_namespaces, render_StringFragment__StringFragment, render_DomFragment_Element_shared_getMatchingStaticNodes, circular );
+	}( circular, utils_warn, config_namespaces, render_StringFragment__StringFragment );
 
 	var render_DomFragment_Element_initialise_decorate_Decorator = function( warn, StringFragment ) {
 
-		var Decorator = function( descriptor, ractive, owner ) {
+		var getValueOptions, Decorator;
+		getValueOptions = {
+			args: true
+		};
+		Decorator = function( descriptor, ractive, owner ) {
 			var decorator = this,
 				name, fragment, errorMessage;
 			decorator.root = ractive;
@@ -30078,10 +30379,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 					root: ractive,
 					owner: owner
 				} );
-				decorator.params = decorator.fragment.toArgsList();
+				decorator.params = decorator.fragment.getValue( getValueOptions );
 				decorator.fragment.bubble = function() {
-					this.dirty = true;
-					decorator.params = this.toArgsList();
+					this.dirtyArgs = this.dirtyValue = true;
+					decorator.params = this.getValue( getValueOptions );
 					if ( decorator.ready ) {
 						decorator.update();
 					}
@@ -30144,7 +30445,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Element_initialise_addEventProxies_addEventProxy = function( warn, StringFragment ) {
 
-		var addEventProxy,
+		var addEventProxy, getValueOptions = {
+				args: true
+			},
 			// helpers
 			MasterEventHandler, ProxyEvent, firePlainEvent, fireEventWithArgs, fireEventWithDynamicArgs, customHandlers, genericHandler, getCustomHandler;
 		addEventProxy = function( element, triggerEventName, proxyDescriptor, indexRefs ) {
@@ -30245,7 +30548,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			].concat( this.a ) );
 		};
 		fireEventWithDynamicArgs = function( event ) {
-			var args = this.d.toArgsList();
+			var args = this.d.getValue( getValueOptions );
 			// need to strip [] from ends if a string!
 			if ( typeof args === 'string' ) {
 				args = args.substr( 1, args.length - 2 );
@@ -30307,7 +30610,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			i = liveQueries.length;
 			while ( i-- ) {
 				selector = liveQueries[ i ];
-				query = liveQueries[ selector ];
+				query = liveQueries[ '_' + selector ];
 				if ( query._test( element ) ) {
 					// keep register of applicable selectors, for when we teardown
 					( element.liveQueries || ( element.liveQueries = [] ) ).push( query );
@@ -30502,7 +30805,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Element_shared_executeTransition_Transition_prototype_animateStyle_createTransitions = function( isClient, warn, createElement, camelCase, interpolate, Ticker, prefix, unprefix, hyphenate ) {
 
-		var testStyle, TRANSITION, TRANSITIONEND, CSS_TRANSITIONS_ENABLED, TRANSITION_DURATION, TRANSITION_PROPERTY, TRANSITION_TIMING_FUNCTION, canUseCssTransitions = {}, cannotUseCssTransitions = {};
+		var testStyle, TRANSITION, TRANSITIONEND, CSS_TRANSITIONS_ENABLED, TRANSITION_DURATION, TRANSITION_PROPERTY, TRANSITION_TIMING_FUNCTION, canUseCssTransitions = {},
+			cannotUseCssTransitions = {};
 		if ( !isClient ) {
 			return;
 		}
@@ -30763,7 +31067,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Element_shared_executeTransition_Transition__Transition = function( warn, StringFragment, init, getStyle, setStyle, animateStyle, processParams, resetStyle ) {
 
-		var Transition;
+		var getValueOptions, Transition;
+		getValueOptions = {
+			args: true
+		};
 		Transition = function( descriptor, root, owner, isIntro ) {
 			var t = this,
 				name, fragment, errorMessage;
@@ -30803,7 +31110,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					root: this.root,
 					owner: owner
 				} );
-				this.params = fragment.toArgsList();
+				this.params = fragment.getValue( getValueOptions );
 				fragment.teardown();
 			}
 			this._fn = root.transitions[ name ];
@@ -30860,13 +31167,17 @@ define('collections', ['underscore', 'backbone', 'models'],
 			parentFragment = element.parentFragment = options.parentFragment;
 			pNode = parentFragment.pNode;
 			descriptor = element.descriptor = options.descriptor;
-			element.parent = options.pElement;
+			element.parent = options.pElement || parentFragment.pElement;
 			element.root = root = parentFragment.root;
 			element.index = options.index;
 			element.lcName = descriptor.e.toLowerCase();
 			element.eventListeners = [];
 			element.customEventListeners = [];
 			element.cssDetachQueue = [];
+			// If this is an option element, we need to store a reference to its select
+			if ( element.lcName === 'option' ) {
+				element.select = findParentSelect( element.parent );
+			}
 			// get namespace, if we're actually rendering (not server-side stringifying)
 			if ( pNode ) {
 				namespace = element.namespace = getElementNamespace( descriptor, pNode );
@@ -30980,10 +31291,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 					runloop.focus( element.node );
 				}
 			}
-			// If this is an option element, we need to store a reference to its select
-			if ( element.lcName === 'option' ) {
-				element.select = findParentSelect( element.parent );
-			}
 			updateLiveQueries( element );
 		};
 
@@ -31038,18 +31345,12 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 
 		function removeFromLiveQueries( element ) {
-			var query, selector, matchingStaticNodes, i, j;
+			var query, selector, i;
 			i = element.liveQueries.length;
 			while ( i-- ) {
 				query = element.liveQueries[ i ];
 				selector = query.selector;
 				query._remove( element.node );
-				if ( element.matchingStaticNodes && ( matchingStaticNodes = element.matchingStaticNodes[ selector ] ) ) {
-					j = matchingStaticNodes.length;
-					while ( j-- ) {
-						query.remove( matchingStaticNodes[ j ] );
-					}
-				}
 			}
 		}
 	}( global_runloop, render_DomFragment_Element_shared_executeTransition__executeTransition );
@@ -31114,14 +31415,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 	var render_DomFragment_Element_prototype_toString = function( voidElementNames, isArray ) {
 
 		return function() {
-			var str, i, len, attrStr;
+			var str;
 			str = '<' + ( this.descriptor.y ? '!doctype' : this.descriptor.e );
-			len = this.attributes.length;
-			for ( i = 0; i < len; i += 1 ) {
-				if ( attrStr = this.attributes[ i ].toString() ) {
-					str += ' ' + attrStr;
-				}
-			}
+			str += this.attributes.map( stringifyAttribute ).join( '' );
 			// Special case - selected options
 			if ( this.lcName === 'option' && optionIsSelected( this ) ) {
 				str += ' selected';
@@ -31131,9 +31427,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				str += ' checked';
 			}
 			str += '>';
-			if ( this.html ) {
-				str += this.html;
-			} else if ( this.fragment ) {
+			if ( this.fragment ) {
 				str += this.fragment.toString();
 			}
 			// add a closing tag if this isn't a void element
@@ -31145,8 +31439,17 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 
 		function optionIsSelected( element ) {
-			var optionValue, selectValueAttribute, selectValueInterpolator, selectValue, i;
-			optionValue = element.attributes.value.value;
+			var optionValue, optionValueAttribute, optionValueInterpolator, selectValueAttribute, selectValueInterpolator, selectValue, i;
+			optionValueAttribute = element.attributes.value;
+			if ( optionValueAttribute.value ) {
+				optionValue = optionValueAttribute.value;
+			} else {
+				optionValueInterpolator = optionValueAttribute.interpolator;
+				if ( !optionValueInterpolator ) {
+					return;
+				}
+				optionValue = element.root.get( optionValueInterpolator.keypath || optionValueInterpolator.ref );
+			}
 			selectValueAttribute = element.select.attributes.value;
 			selectValueInterpolator = selectValueAttribute.interpolator;
 			if ( !selectValueInterpolator ) {
@@ -31179,17 +31482,18 @@ define('collections', ['underscore', 'backbone', 'models'],
 				return true;
 			}
 		}
+
+		function stringifyAttribute( attribute ) {
+			var str = attribute.toString();
+			return str ? ' ' + str : '';
+		}
 	}( config_voidElementNames, utils_isArray );
 
 	var render_DomFragment_Element_prototype_find = function( matches ) {
 
 		return function( selector ) {
-			var queryResult;
 			if ( matches( this.node, selector ) ) {
 				return this.node;
-			}
-			if ( this.html && ( queryResult = this.node.querySelector( selector ) ) ) {
-				return queryResult;
 			}
 			if ( this.fragment && this.fragment.find ) {
 				return this.fragment.find( selector );
@@ -31197,27 +31501,16 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( utils_matches );
 
-	var render_DomFragment_Element_prototype_findAll = function( getMatchingStaticNodes ) {
-
-		return function( selector, query ) {
-			var matchingStaticNodes, matchedSelf;
-			// Add this node to the query, if applicable, and register the
-			// query on this element
-			if ( query._test( this, true ) && query.live ) {
-				( this.liveQueries || ( this.liveQueries = [] ) ).push( query );
-			}
-			if ( this.html ) {
-				matchingStaticNodes = getMatchingStaticNodes( this, selector );
-				query.push.apply( query, matchingStaticNodes );
-				if ( query.live && !matchedSelf ) {
-					( this.liveQueries || ( this.liveQueries = [] ) ).push( query );
-				}
-			}
-			if ( this.fragment ) {
-				this.fragment.findAll( selector, query );
-			}
-		};
-	}( render_DomFragment_Element_shared_getMatchingStaticNodes );
+	var render_DomFragment_Element_prototype_findAll = function( selector, query ) {
+		// Add this node to the query, if applicable, and register the
+		// query on this element
+		if ( query._test( this, true ) && query.live ) {
+			( this.liveQueries || ( this.liveQueries = [] ) ).push( query );
+		}
+		if ( this.fragment ) {
+			this.fragment.findAll( selector, query );
+		}
+	};
 
 	var render_DomFragment_Element_prototype_findComponent = function( selector ) {
 		if ( this.fragment ) {
@@ -31248,7 +31541,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			return;
 		}
 		// an element can only have one two-way attribute
-		switch ( this.descriptor.e ) {
+		switch ( this.lcName ) {
 			case 'select':
 			case 'textarea':
 				if ( attributes.value ) {
@@ -31618,7 +31911,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			tokenizer.allowWhitespace();
 			if ( !tokenizer.getStringMatch( delimiters[ 1 ] ) ) {
 				tokenizer.pos = start;
-				return null;
+				tokenizer.expected( 'closing delimiter "' + delimiters[ 1 ] + '" after reference' );
 			}
 			return content;
 		}
@@ -31634,7 +31927,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			remaining = this.remaining();
 			endIndex = remaining.indexOf( '-->' );
 			if ( endIndex === -1 ) {
-				throw new Error( 'Unexpected end of input (expected "-->" to close comment)' );
+				throw new Error( 'Unexpected end of input (expected "-->" to close comment) on line ' + this.getLinePos() );
 			}
 			content = remaining.substr( 0, endIndex );
 			this.pos += endIndex + 3;
@@ -31719,7 +32012,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			var start, tag, expected;
 			start = tokenizer.pos;
 			expected = function( str ) {
-				throw new Error( 'Unexpected character ' + tokenizer.remaining().charAt( 0 ) + ' (expected ' + str + ')' );
+				throw new Error( 'Unexpected character ' + tokenizer.remaining().charAt( 0 ) + ' (expected ' + str + ') on line ' + tokenizer.getLinePos() );
 			};
 			if ( !tokenizer.getStringMatch( '<' ) ) {
 				return null;
@@ -32402,6 +32695,13 @@ define('collections', ['underscore', 'backbone', 'models'],
 			var token;
 			this.str = str;
 			this.pos = 0;
+			this.lines = [ 0 ];
+			var index = 0;
+			while ( ( index = str.indexOf( '\n', index ) ) >= 0 ) {
+				index++;
+				this.lines.push( index );
+			}
+			this.lines.push( str.length + 1 );
 			this.delimiters = options.delimiters;
 			this.tripleDelimiters = options.tripleDelimiters;
 			this.interpolate = options.interpolate;
@@ -32414,10 +32714,57 @@ define('collections', ['underscore', 'backbone', 'models'],
 				this.tokens.push( token );
 			}
 		};
+		// from http://stackoverflow.com/a/4431347/100374
+		function getClosestLowIndex( a, x ) {
+			var lo = -1;
+			var hi = a.length;
+			while ( hi - lo > 1 ) {
+				var mid = 0 | ( lo + hi ) / 2;
+				if ( a[ mid ] <= x ) {
+					lo = mid;
+				} else {
+					hi = mid;
+				}
+			}
+			return lo;
+		}
 		Tokenizer.prototype = {
 			getToken: function() {
+				var tokenizer = this;
+				var pos = this.pos;
 				var token = this.getMustache() || this.getComment() || this.getTag() || this.getText();
+				if ( token ) {
+					token.getLinePos = function() {
+						return tokenizer.getLinePos( pos );
+					};
+				}
 				return token;
+			},
+			getLinePos: function( pos ) {
+				if ( arguments.length === 0 ) {
+					pos = this.pos;
+				}
+				var lines = this.lines;
+				var str = this.str;
+				var line = getClosestLowIndex( lines, pos );
+				var lineStart = lines[ line ];
+				return {
+					line: line + 1,
+					ch: pos - lineStart + 1,
+					getLine: function() {
+						return str.substring( lineStart, lines[ line + 1 ] - 1 );
+					},
+					toJSON: function() {
+						return [
+							this.line,
+							this.ch
+						];
+					},
+					toString: function() {
+						var line = this.getLine();
+						return this.line + ':' + this.ch + ':\n' + line + '\n' + line.substr( 0, this.ch - 1 ).replace( /[\S]/g, ' ' ) + '^----';
+					}
+				};
 			},
 			getMustache: getMustache,
 			getComment: getComment,
@@ -32440,14 +32787,14 @@ define('collections', ['underscore', 'backbone', 'models'],
 				if ( next20.length === 20 ) {
 					next20 = next20 + '...';
 				}
-				throw new Error( 'Could not parse template: ' + ( last20 ? last20 + '<- ' : '' ) + 'failed at character ' + this.pos + ' ->' + next20 );
+				throw new Error( 'Could not parse template: ' + ( last20 ? last20 + '<- ' : '' ) + ' on line ' + this.getLinePos() + ' ->' + next20 );
 			},
 			expected: function( thing ) {
 				var remaining = this.remaining().substr( 0, 40 );
 				if ( remaining.length === 40 ) {
 					remaining += '...';
 				}
-				throw new Error( 'Tokenizer failed: unexpected string "' + remaining + '" (expected ' + thing + ')' );
+				throw new Error( 'Tokenizer failed: unexpected string "' + remaining + '" (expected ' + thing + ') on line ' + this.getLinePos() );
 			}
 		};
 		return Tokenizer;
@@ -32478,25 +32825,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( config_initOptions, parse_utils_stripHtmlComments, parse_utils_stripStandalones, parse_utils_stripCommentTokens, parse_Tokenizer__Tokenizer );
 
-	var parse_Parser_getText_TextStub__TextStub = function( types ) {
+	var parse_Parser_utils_decodeCharacterReferences = function() {
 
-		var TextStub,
-			// helpers
-			htmlEntities, controlCharacters, namedEntityPattern, hexEntityPattern, decimalEntityPattern, validateCode, decodeCharacterReferences, whitespace;
-		TextStub = function( token, preserveWhitespace ) {
-			this.text = preserveWhitespace ? token.value : token.value.replace( whitespace, ' ' );
-		};
-		TextStub.prototype = {
-			type: types.TEXT,
-			toJSON: function() {
-				// this will be used within HTML, so we need to decode things like &amp;
-				return this.decoded || ( this.decoded = decodeCharacterReferences( this.text ) );
-			},
-			toString: function() {
-				// this will be used as straight text
-				return this.text;
-			}
-		};
+		var htmlEntities, controlCharacters, namedEntityPattern, hexEntityPattern, decimalEntityPattern;
 		htmlEntities = {
 			quot: 34,
 			amp: 38,
@@ -32789,12 +33120,31 @@ define('collections', ['underscore', 'backbone', 'models'],
 		namedEntityPattern = new RegExp( '&(' + Object.keys( htmlEntities ).join( '|' ) + ');?', 'g' );
 		hexEntityPattern = /&#x([0-9]+);?/g;
 		decimalEntityPattern = /&#([0-9]+);?/g;
+		return function decodeCharacterReferences( html ) {
+			var result;
+			// named entities
+			result = html.replace( namedEntityPattern, function( match, name ) {
+				if ( htmlEntities[ name ] ) {
+					return String.fromCharCode( htmlEntities[ name ] );
+				}
+				return match;
+			} );
+			// hex references
+			result = result.replace( hexEntityPattern, function( match, hex ) {
+				return String.fromCharCode( validateCode( parseInt( hex, 16 ) ) );
+			} );
+			// decimal references
+			result = result.replace( decimalEntityPattern, function( match, charCode ) {
+				return String.fromCharCode( validateCode( charCode ) );
+			} );
+			return result;
+		};
 		// some code points are verboten. If we were inserting HTML, the browser would replace the illegal
 		// code points with alternatives in some cases - since we're bypassing that mechanism, we need
 		// to replace them ourselves
 		//
 		// Source: http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters
-		validateCode = function( code ) {
+		function validateCode( code ) {
 			if ( !code ) {
 				return 65533;
 			}
@@ -32826,97 +33176,53 @@ define('collections', ['underscore', 'backbone', 'models'],
 			// TODO it's... not exactly clear what should happen with code points over this value. The
 			// following seems to work. But I can't guarantee it works in China!
 			return 65533;
-		};
-		decodeCharacterReferences = function( html ) {
-			var result;
-			// named entities
-			result = html.replace( namedEntityPattern, function( match, name ) {
-				if ( htmlEntities[ name ] ) {
-					return String.fromCharCode( htmlEntities[ name ] );
-				}
-				return match;
-			} );
-			// hex references
-			result = result.replace( hexEntityPattern, function( match, hex ) {
-				return String.fromCharCode( validateCode( parseInt( hex, 16 ) ) );
-			} );
-			// decimal references
-			result = result.replace( decimalEntityPattern, function( match, charCode ) {
-				return String.fromCharCode( validateCode( charCode ) );
-			} );
-			return result;
-		};
-		whitespace = /\s+/g;
-		return TextStub;
-	}( config_types );
+		}
+	}();
 
-	var parse_Parser_getText__getText = function( types, TextStub ) {
+	var parse_Parser_getText = function( types, decodeCharacterReferences ) {
 
+		var whitespace = /\s+/g;
 		return function( token, preserveWhitespace ) {
+			var text;
 			if ( token.type === types.TEXT ) {
 				this.pos += 1;
-				return new TextStub( token, preserveWhitespace );
+				text = preserveWhitespace ? token.value : token.value.replace( whitespace, ' ' );
+				return decodeCharacterReferences( text );
 			}
 			return null;
 		};
-	}( config_types, parse_Parser_getText_TextStub__TextStub );
+	}( config_types, parse_Parser_utils_decodeCharacterReferences );
 
-	var parse_Parser_getComment_CommentStub__CommentStub = function( types ) {
-
-		var CommentStub;
-		CommentStub = function( token ) {
-			this.content = token.content;
-		};
-		CommentStub.prototype = {
-			toJSON: function() {
-				return {
-					t: types.COMMENT,
-					f: this.content
-				};
-			},
-			toString: function() {
-				return '<!--' + this.content + '-->';
-			}
-		};
-		return CommentStub;
-	}( config_types );
-
-	var parse_Parser_getComment__getComment = function( types, CommentStub ) {
+	var parse_Parser_getComment = function( types ) {
 
 		return function( token ) {
 			if ( token.type === types.COMMENT ) {
 				this.pos += 1;
-				return new CommentStub( token, this.preserveWhitespace );
+				return {
+					t: types.COMMENT,
+					c: token.content
+				};
 			}
 			return null;
 		};
-	}( config_types, parse_Parser_getComment_CommentStub__CommentStub );
+	}( config_types );
 
-	var parse_Parser_getMustache_ExpressionStub = function( types, isObject ) {
+	var parse_Parser_expressions_getExpression = function( types, isObject ) {
 
-		var ExpressionStub = function( token ) {
-			this.refs = [];
-			getRefs( token, this.refs );
-			this.str = stringify( token, this.refs );
+		return function getExpression( token ) {
+			var refs = [];
+			extractRefs( token, refs );
+			return {
+				r: refs,
+				s: stringify( token, refs )
+			};
 		};
-		ExpressionStub.prototype = {
-			toJSON: function() {
-				if ( !this.json ) {
-					this.json = {
-						r: this.refs,
-						s: this.str
-					};
-				}
-				return this.json;
-			}
-		};
-		return ExpressionStub;
 
 		function quoteStringLiteral( str ) {
 			return JSON.stringify( String( str ) );
 		}
 		// TODO maybe refactor this?
-		function getRefs( token, refs ) {
+		function extractRefs( token, refs ) {
 			var i, list;
 			if ( token.t === types.REFERENCE ) {
 				if ( refs.indexOf( token.n ) === -1 ) {
@@ -32926,22 +33232,22 @@ define('collections', ['underscore', 'backbone', 'models'],
 			list = token.o || token.m;
 			if ( list ) {
 				if ( isObject( list ) ) {
-					getRefs( list, refs );
+					extractRefs( list, refs );
 				} else {
 					i = list.length;
 					while ( i-- ) {
-						getRefs( list[ i ], refs );
+						extractRefs( list[ i ], refs );
 					}
 				}
 			}
 			if ( token.x ) {
-				getRefs( token.x, refs );
+				extractRefs( token.x, refs );
 			}
 			if ( token.r ) {
-				getRefs( token.r, refs );
+				extractRefs( token.r, refs );
 			}
 			if ( token.v ) {
-				getRefs( token.v, refs );
+				extractRefs( token.v, refs );
 			}
 		}
 
@@ -32979,26 +33285,19 @@ define('collections', ['underscore', 'backbone', 'models'],
 				case types.REFERENCE:
 					return '${' + refs.indexOf( token.n ) + '}';
 				default:
-					throw new Error( 'Could not stringify expression token. This error is unexpected' );
+					throw new Error( 'Could not stringify expression token. This error is unexpected on line ' + token.getLinePos() );
 			}
 		}
 	}( config_types, utils_isObject );
 
-	var parse_Parser_getMustache_KeypathExpressionStub = function( types, ExpressionStub ) {
+	var parse_Parser_expressions_getKeypathExpression = function( types, getExpression ) {
 
-		var KeypathExpressionStub;
-		KeypathExpressionStub = function( token ) {
-			this.json = {
+		return function getKeypathExpression( token ) {
+			return {
 				r: token.r,
 				m: token.m.map( jsonify )
 			};
 		};
-		KeypathExpressionStub.prototype = {
-			toJSON: function() {
-				return this.json;
-			}
-		};
-		return KeypathExpressionStub;
 
 		function jsonify( member ) {
 			// Straightforward property, e.g. `foo.bar`?
@@ -33014,221 +33313,80 @@ define('collections', ['underscore', 'backbone', 'models'],
 				return member.x;
 			}
 			// If none of the above, we need to process the AST
-			return new ExpressionStub( member.x ).toJSON();
+			return getExpression( member.x );
 		}
-	}( config_types, parse_Parser_getMustache_ExpressionStub );
+	}( config_types, parse_Parser_expressions_getExpression );
 
-	var parse_Parser_getMustache_MustacheStub = function( types, KeypathExpressionStub, ExpressionStub ) {
+	var parse_Parser_getMustache = function( types, normaliseKeypath, getKeypathExpression, getExpression ) {
 
-		var MustacheStub = function( token, parser ) {
-			this.type = token.type === types.TRIPLE ? types.TRIPLE : token.mustacheType;
-			if ( token.ref ) {
-				this.ref = token.ref;
-			}
-			if ( token.keypathExpression ) {
-				this.keypathExpr = new KeypathExpressionStub( token.keypathExpression );
-			}
-			if ( token.expression ) {
-				this.expr = new ExpressionStub( token.expression );
-			}
-			parser.pos += 1;
-		};
-		MustacheStub.prototype = {
-			toJSON: function() {
-				var json;
-				if ( this.json ) {
-					return this.json;
+		return function( token ) {
+			var stub, isSection, type, nextToken, fragment;
+			if ( token.type === types.MUSTACHE || token.type === types.TRIPLE ) {
+				if ( token.mustacheType === types.SECTION || token.mustacheType === types.INVERTED ) {
+					isSection = true;
 				}
-				json = {
-					t: this.type
+				this.pos += 1;
+				if ( token.type === types.TRIPLE ) {
+					type = types.TRIPLE;
+				} else if ( isSection ) {
+					type = types.SECTION;
+				} else {
+					type = token.mustacheType;
+				}
+				stub = {
+					t: type
 				};
-				if ( this.ref ) {
-					json.r = this.ref;
+				if ( token.ref ) {
+					stub.r = token.ref;
 				}
-				if ( this.keypathExpr ) {
-					json.kx = this.keypathExpr.toJSON();
+				if ( token.keypathExpression ) {
+					stub.kx = getKeypathExpression( token.keypathExpression );
 				}
-				if ( this.expr ) {
-					json.x = this.expr.toJSON();
+				if ( token.expression ) {
+					stub.x = getExpression( token.expression );
 				}
-				this.json = json;
-				return json;
-			},
-			toString: function() {
-				// mustaches cannot be stringified
-				return false;
-			}
-		};
-		return MustacheStub;
-	}( config_types, parse_Parser_getMustache_KeypathExpressionStub, parse_Parser_getMustache_ExpressionStub );
-
-	var parse_Parser_utils_stringifyStubs = function( items ) {
-		var str = '',
-			itemStr, i, len;
-		if ( !items ) {
-			return '';
-		}
-		for ( i = 0, len = items.length; i < len; i += 1 ) {
-			itemStr = items[ i ].toString();
-			if ( itemStr === false ) {
-				return false;
-			}
-			str += itemStr;
-		}
-		return str;
-	};
-
-	var parse_Parser_utils_jsonifyStubs = function( stringifyStubs ) {
-
-		return function( items, noStringify, topLevel ) {
-			var str, json;
-			if ( !topLevel && !noStringify ) {
-				str = stringifyStubs( items );
-				if ( str !== false ) {
-					return str;
+				if ( isSection ) {
+					if ( token.mustacheType === types.INVERTED ) {
+						stub.n = 1;
+					}
+					if ( token.indexRef ) {
+						stub.i = token.indexRef;
+					}
+					fragment = [];
+					nextToken = this.next();
+					while ( nextToken ) {
+						if ( nextToken.mustacheType === types.CLOSING ) {
+							validateClosing( stub, nextToken );
+							this.pos += 1;
+							break;
+						}
+						fragment.push( this.getItem() );
+						nextToken = this.next();
+					}
+					if ( fragment.length ) {
+						stub.f = fragment;
+					}
 				}
-			}
-			json = items.map( function( item ) {
-				return item.toJSON( noStringify );
-			} );
-			return json;
-		};
-	}( parse_Parser_utils_stringifyStubs );
-
-	var parse_Parser_getMustache_SectionStub = function( types, normaliseKeypath, jsonifyStubs, KeypathExpressionStub, ExpressionStub ) {
-
-		var SectionStub = function( firstToken, parser ) {
-			var next;
-			this.ref = firstToken.ref;
-			this.indexRef = firstToken.indexRef;
-			this.inverted = firstToken.mustacheType === types.INVERTED;
-			if ( firstToken.keypathExpression ) {
-				this.keypathExpr = new KeypathExpressionStub( firstToken.keypathExpression );
-			}
-			if ( firstToken.expression ) {
-				this.expr = new ExpressionStub( firstToken.expression );
-			}
-			parser.pos += 1;
-			this.items = [];
-			next = parser.next();
-			while ( next ) {
-				if ( next.mustacheType === types.CLOSING ) {
-					validateClosing( this, next );
-					parser.pos += 1;
-					break;
-				}
-				this.items.push( parser.getStub() );
-				next = parser.next();
+				return stub;
 			}
 		};
 
 		function validateClosing( stub, token ) {
-			var opening = stub.ref,
+			var opening = stub.r,
 				closing = normaliseKeypath( token.ref.trim() );
 			if ( !opening || !closing ) {
 				return;
 			}
-			if ( stub.indexRef ) {
-				opening += ':' + stub.indexRef;
+			if ( stub.i ) {
+				opening += ':' + stub.i;
 			}
 			if ( opening.substr( 0, closing.length ) !== closing ) {
-				throw new Error( 'Could not parse template: Illegal closing section {{/' + closing + '}}. Expected {{/' + stub.ref + '}}.' );
+				throw new Error( 'Could not parse template: Illegal closing section {{/' + closing + '}}. Expected {{/' + stub.r + '}} on line ' + token.getLinePos() );
 			}
 		}
-		SectionStub.prototype = {
-			toJSON: function( noStringify ) {
-				var json;
-				if ( this.json ) {
-					return this.json;
-				}
-				json = {
-					t: types.SECTION
-				};
-				if ( this.ref ) {
-					json.r = this.ref;
-				}
-				if ( this.indexRef ) {
-					json.i = this.indexRef;
-				}
-				if ( this.inverted ) {
-					json.n = true;
-				}
-				if ( this.expr ) {
-					json.x = this.expr.toJSON();
-				}
-				if ( this.keypathExpr ) {
-					json.kx = this.keypathExpr.toJSON();
-				}
-				if ( this.items.length ) {
-					json.f = jsonifyStubs( this.items, noStringify );
-				}
-				this.json = json;
-				return json;
-			},
-			toString: function() {
-				// sections cannot be stringified
-				return false;
-			}
-		};
-		return SectionStub;
-	}( config_types, utils_normaliseKeypath, parse_Parser_utils_jsonifyStubs, parse_Parser_getMustache_KeypathExpressionStub, parse_Parser_getMustache_ExpressionStub );
+	}( config_types, utils_normaliseKeypath, parse_Parser_expressions_getKeypathExpression, parse_Parser_expressions_getExpression );
 
-	var parse_Parser_getMustache__getMustache = function( types, MustacheStub, SectionStub ) {
-
-		return function( token ) {
-			if ( token.type === types.MUSTACHE || token.type === types.TRIPLE ) {
-				if ( token.mustacheType === types.SECTION || token.mustacheType === types.INVERTED ) {
-					return new SectionStub( token, this );
-				}
-				return new MustacheStub( token, this );
-			}
-		};
-	}( config_types, parse_Parser_getMustache_MustacheStub, parse_Parser_getMustache_SectionStub );
-
-	var parse_Parser_getElement_ElementStub_utils_siblingsByTagName = {
-		li: [ 'li' ],
-		dt: [
-			'dt',
-			'dd'
-		],
-		dd: [
-			'dt',
-			'dd'
-		],
-		p: 'address article aside blockquote dir div dl fieldset footer form h1 h2 h3 h4 h5 h6 header hgroup hr menu nav ol p pre section table ul'.split( ' ' ),
-		rt: [
-			'rt',
-			'rp'
-		],
-		rp: [
-			'rp',
-			'rt'
-		],
-		optgroup: [ 'optgroup' ],
-		option: [
-			'option',
-			'optgroup'
-		],
-		thead: [
-			'tbody',
-			'tfoot'
-		],
-		tbody: [
-			'tbody',
-			'tfoot'
-		],
-		tr: [ 'tr' ],
-		td: [
-			'td',
-			'th'
-		],
-		th: [
-			'td',
-			'th'
-		]
-	};
-
-	var parse_Parser_getElement_ElementStub_utils_filterAttributes = function( isArray ) {
+	var parse_Parser_getElement_utils_filterAttributes = function( isArray ) {
 
 		return function( items ) {
 			var attrs, proxies, filtered, i, len, item;
@@ -33290,18 +33448,28 @@ define('collections', ['underscore', 'backbone', 'models'],
 		}
 	}( utils_isArray );
 
-	var parse_Parser_getElement_ElementStub_utils_processDirective = function( types, parseJSON ) {
+	var parse_Parser_utils_getStringFragment = function( circular ) {
 
+		var Parser, empty = {};
+		circular.push( function() {
+			Parser = circular.Parser;
+		} );
+		return function getStringFragment( tokens ) {
+			var parser = new Parser( tokens, empty );
+			return parser.result;
+		};
+	}( circular );
+
+	var parse_Parser_getElement_utils_processDirective = function( types, parseJSON, getStringFragment ) {
+
+		// TODO clean this up, it's shocking
 		return function( directive ) {
-			var processed, tokens, token, colonIndex, throwError, directiveName, directiveArgs, parsed;
-			throwError = function() {
-				throw new Error( 'Illegal directive' );
-			};
+			var result, tokens, token, colonIndex, directiveName, directiveArgs, parsed;
 			if ( !directive.name || !directive.value ) {
-				throwError();
+				throw new Error( 'Illegal directive' );
 			}
-			processed = {
-				directiveType: directive.name
+			result = {
+				type: directive.name
 			};
 			tokens = directive.value;
 			directiveName = [];
@@ -33337,395 +33505,231 @@ define('collections', ['underscore', 'backbone', 'models'],
 			}
 			directiveArgs = directiveArgs.concat( tokens );
 			if ( directiveName.length === 1 && directiveName[ 0 ].type === types.TEXT ) {
-				processed.name = directiveName[ 0 ].value;
+				directiveName = directiveName[ 0 ].value;
 			} else {
-				processed.name = directiveName;
+				directiveName = getStringFragment( directiveName );
 			}
-			if ( directiveArgs.length ) {
+			if ( directiveArgs.length || typeof directiveName !== 'string' ) {
+				result.value = {
+					n: directiveName
+				};
 				if ( directiveArgs.length === 1 && directiveArgs[ 0 ].type === types.TEXT ) {
 					parsed = parseJSON( '[' + directiveArgs[ 0 ].value + ']' );
-					processed.args = parsed ? parsed.value : directiveArgs[ 0 ].value;
+					result.value.a = parsed ? parsed.value : directiveArgs[ 0 ].value;
 				} else {
-					processed.dynamicArgs = directiveArgs;
+					result.value.d = getStringFragment( directiveArgs );
 				}
-			}
-			return processed;
-		};
-	}( config_types, utils_parseJSON );
-
-	var parse_Parser_StringStub_StringParser = function( getText, getMustache ) {
-
-		var StringParser;
-		StringParser = function( tokens, options ) {
-			// TODO what are the options?
-			var stub;
-			this.tokens = tokens || [];
-			this.pos = 0;
-			this.options = options;
-			this.result = [];
-			while ( stub = this.getStub() ) {
-				this.result.push( stub );
-			}
-		};
-		StringParser.prototype = {
-			getStub: function() {
-				var token = this.next();
-				if ( !token ) {
-					return null;
-				}
-				return this.getText( token ) || this.getMustache( token );
-			},
-			getText: getText,
-			getMustache: getMustache,
-			next: function() {
-				return this.tokens[ this.pos ];
-			}
-		};
-		return StringParser;
-	}( parse_Parser_getText__getText, parse_Parser_getMustache__getMustache );
-
-	var parse_Parser_StringStub__StringStub = function( StringParser, stringifyStubs, jsonifyStubs ) {
-
-		var StringStub;
-		StringStub = function( tokens ) {
-			var parser = new StringParser( tokens );
-			this.stubs = parser.result;
-		};
-		StringStub.prototype = {
-			toJSON: function( noStringify ) {
-				var json;
-				if ( this[ 'json_' + noStringify ] ) {
-					return this[ 'json_' + noStringify ];
-				}
-				json = this[ 'json_' + noStringify ] = jsonifyStubs( this.stubs, noStringify );
-				return json;
-			},
-			toString: function() {
-				if ( this.str !== undefined ) {
-					return this.str;
-				}
-				this.str = stringifyStubs( this.stubs );
-				return this.str;
-			}
-		};
-		return StringStub;
-	}( parse_Parser_StringStub_StringParser, parse_Parser_utils_stringifyStubs, parse_Parser_utils_jsonifyStubs );
-
-	var parse_Parser_getElement_ElementStub_utils_jsonifyDirective = function( StringStub ) {
-
-		return function( directive ) {
-			var result, name;
-			if ( typeof directive.name === 'string' ) {
-				if ( !directive.args && !directive.dynamicArgs ) {
-					return directive.name;
-				}
-				name = directive.name;
 			} else {
-				name = new StringStub( directive.name ).toJSON();
-			}
-			result = {
-				n: name
-			};
-			if ( directive.args ) {
-				result.a = directive.args;
-				return result;
-			}
-			if ( directive.dynamicArgs ) {
-				result.d = new StringStub( directive.dynamicArgs ).toJSON();
+				result.value = directiveName;
 			}
 			return result;
 		};
-	}( parse_Parser_StringStub__StringStub );
+	}( config_types, utils_parseJSON, parse_Parser_utils_getStringFragment );
 
-	var parse_Parser_getElement_ElementStub_toJSON = function( types, jsonifyStubs, jsonifyDirective ) {
+	var parse_Parser_getElement_utils_getAttributeStubs = function( getStringFragment ) {
 
-		return function( noStringify ) {
-			var json, name, value, proxy, i, len, attribute;
-			if ( this[ 'json_' + noStringify ] ) {
-				return this[ 'json_' + noStringify ];
-			}
-			json = {
-				t: types.ELEMENT,
-				e: this.tag
-			};
-			if ( this.doctype ) {
-				json.y = 1;
-			}
-			if ( this.attributes && this.attributes.length ) {
-				json.a = {};
-				len = this.attributes.length;
-				for ( i = 0; i < len; i += 1 ) {
-					attribute = this.attributes[ i ];
-					name = attribute.name;
-					if ( json.a[ name ] ) {
-						throw new Error( 'You cannot have multiple attributes with the same name' );
+		return function( attributes ) {
+			var a;
+			a = {};
+			attributes.forEach( function( attribute ) {
+				var value;
+				if ( attribute.value ) {
+					value = getStringFragment( attribute.value );
+					if ( value.length === 1 && typeof value[ 0 ] === 'string' ) {
+						value = value[ 0 ];
 					}
-					// empty attributes (e.g. autoplay, checked)
-					if ( attribute.value === null ) {
-						value = null;
-					} else {
-						//value = jsonifyStubs( attribute.value, noStringify );
-						value = attribute.value.toJSON( noStringify );
-					}
-					json.a[ name ] = value;
+				} else {
+					value = 0;
 				}
-			}
-			if ( this.items && this.items.length ) {
-				json.f = jsonifyStubs( this.items, noStringify );
-			}
-			if ( this.proxies && this.proxies.length ) {
-				json.v = {};
-				len = this.proxies.length;
-				for ( i = 0; i < len; i += 1 ) {
-					proxy = this.proxies[ i ];
-					json.v[ proxy.directiveType ] = jsonifyDirective( proxy );
-				}
-			}
-			if ( this.intro ) {
-				json.t1 = jsonifyDirective( this.intro );
-			}
-			if ( this.outro ) {
-				json.t2 = jsonifyDirective( this.outro );
-			}
-			if ( this.decorator ) {
-				json.o = jsonifyDirective( this.decorator );
-			}
-			this[ 'json_' + noStringify ] = json;
-			return json;
+				a[ attribute.name ] = value;
+			} );
+			return a;
 		};
-	}( config_types, parse_Parser_utils_jsonifyStubs, parse_Parser_getElement_ElementStub_utils_jsonifyDirective );
+	}( parse_Parser_utils_getStringFragment );
 
-	var parse_Parser_getElement_ElementStub_toString = function( stringifyStubs, voidElementNames ) {
+	var parse_Parser_getElement_utils_siblingsByTagName = {
+		li: [ 'li' ],
+		dt: [
+			'dt',
+			'dd'
+		],
+		dd: [
+			'dt',
+			'dd'
+		],
+		p: 'address article aside blockquote dir div dl fieldset footer form h1 h2 h3 h4 h5 h6 header hgroup hr menu nav ol p pre section table ul'.split( ' ' ),
+		rt: [
+			'rt',
+			'rp'
+		],
+		rp: [
+			'rp',
+			'rt'
+		],
+		optgroup: [ 'optgroup' ],
+		option: [
+			'option',
+			'optgroup'
+		],
+		thead: [
+			'tbody',
+			'tfoot'
+		],
+		tbody: [
+			'tbody',
+			'tfoot'
+		],
+		tr: [ 'tr' ],
+		td: [
+			'td',
+			'th'
+		],
+		th: [
+			'td',
+			'th'
+		]
+	};
 
-		var htmlElements;
-		htmlElements = 'a abbr acronym address applet area b base basefont bdo big blockquote body br button caption center cite code col colgroup dd del dfn dir div dl dt em fieldset font form frame frameset h1 h2 h3 h4 h5 h6 head hr html i iframe img input ins isindex kbd label legend li link map menu meta noframes noscript object ol p param pre q s samp script select small span strike strong style sub sup textarea title tt u ul var article aside audio bdi canvas command data datagrid datalist details embed eventsource figcaption figure footer header hgroup keygen mark meter nav output progress ruby rp rt section source summary time track video wbr'.split( ' ' );
-		return function() {
-			var str, i, len, attrStr, name, attrValueStr, fragStr, isVoid;
-			if ( this.str !== undefined ) {
-				return this.str;
-			}
-			// if this isn't an HTML element, it can't be stringified (since the only reason to stringify an
-			// element is to use with innerHTML, and SVG doesn't support that method.
-			// Note: table elements and select children are excluded from this, because IE (of course)
-			// fucks up when you use innerHTML with them
-			if ( htmlElements.indexOf( this.tag.toLowerCase() ) === -1 ) {
-				return this.str = false;
-			}
-			// do we have proxies or transitions or a decorator? if so we can't use innerHTML
-			if ( this.proxies || this.intro || this.outro || this.decorator ) {
-				return this.str = false;
-			}
-			// see if children can be stringified (i.e. don't contain mustaches)
-			fragStr = stringifyStubs( this.items );
-			if ( fragStr === false ) {
-				return this.str = false;
-			}
-			// is this a void element?
-			isVoid = voidElementNames.indexOf( this.tag.toLowerCase() ) !== -1;
-			str = '<' + this.tag;
-			if ( this.attributes ) {
-				for ( i = 0, len = this.attributes.length; i < len; i += 1 ) {
-					name = this.attributes[ i ].name;
-					// does this look like a namespaced attribute? if so we can't stringify it
-					if ( name.indexOf( ':' ) !== -1 ) {
-						return this.str = false;
-					}
-					// if this element has an id attribute, it can't be stringified (since references are stored
-					// in ractive.nodes). Similarly, intro and outro transitions
-					if ( name === 'id' || name === 'intro' || name === 'outro' ) {
-						return this.str = false;
-					}
-					attrStr = ' ' + name;
-					// empty attributes
-					if ( this.attributes[ i ].value !== null ) {
-						attrValueStr = this.attributes[ i ].value.toString();
-						if ( attrValueStr === false ) {
-							return this.str = false;
-						}
-						if ( attrValueStr !== '' ) {
-							attrStr += '=';
-							// does it need to be quoted?
-							if ( /[\s"'=<>`]/.test( attrValueStr ) ) {
-								attrStr += '"' + attrValueStr.replace( /"/g, '&quot;' ) + '"';
-							} else {
-								attrStr += attrValueStr;
-							}
-						}
-					}
-					str += attrStr;
-				}
-			}
-			// if this isn't a void tag, but is self-closing, add a solidus. Aaaaand, we're done
-			if ( this.selfClosing && !isVoid ) {
-				str += '/>';
-				return this.str = str;
-			}
-			str += '>';
-			// void element? we're done
-			if ( isVoid ) {
-				return this.str = str;
-			}
-			// if this has children, add them
-			str += fragStr;
-			str += '</' + this.tag + '>';
-			return this.str = str;
-		};
-	}( parse_Parser_utils_stringifyStubs, config_voidElementNames );
+	var parse_Parser_getElement__getElement = function( types, voidElementNames, filterAttributes, processDirective, getAttributeStubs, siblingsByTagName ) {
 
-	var parse_Parser_getElement_ElementStub__ElementStub = function( types, voidElementNames, warn, siblingsByTagName, filterAttributes, processDirective, toJSON, toString, StringStub ) {
-
-		var ElementStub,
-			// helpers
-			allElementNames, closedByParentClose, onPattern, sanitize, leadingWhitespace = /^\s+/,
-			trailingWhitespace = /\s+$/;
-		ElementStub = function( firstToken, parser, preserveWhitespace ) {
-			var next, attrs, filtered, proxies, item, getFrag, lowerCaseTag;
-			parser.pos += 1;
-			getFrag = function( attr ) {
-				return {
-					name: attr.name,
-					value: attr.value ? new StringStub( attr.value ) : null
-				};
-			};
-			// enforce lower case tag names by default. HTML doesn't care. SVG does, so if we see an SVG tag
-			// that should be camelcased, camelcase it
-			this.tag = firstToken.name;
-			lowerCaseTag = firstToken.name.toLowerCase();
-			if ( lowerCaseTag.substr( 0, 3 ) === 'rv-' ) {
-				warn( 'The "rv-" prefix for components has been deprecated. Support will be removed in a future version' );
-				this.tag = this.tag.substring( 3 );
+		var leadingWhitespace = /^\s+/,
+			trailingWhitespace = /\s+$/,
+			onPattern = /^on[a-zA-Z]/;
+		return function( token, preserveWhitespace ) {
+			var stub, lowerCaseTag, filtered, attrs, proxies, siblings, fragment, nextToken, item;
+			// Not a tag?
+			if ( token.type !== types.TAG ) {
+				return null;
 			}
-			// if this is a <pre> element, preserve whitespace within
-			preserveWhitespace = preserveWhitespace || lowerCaseTag === 'pre' || lowerCaseTag === 'style' || lowerCaseTag === 'script';
-			if ( firstToken.attrs ) {
-				filtered = filterAttributes( firstToken.attrs );
-				attrs = filtered.attrs;
-				proxies = filtered.proxies;
-				// remove event attributes (e.g. onclick='doSomething()') if we're sanitizing
-				if ( parser.options.sanitize && parser.options.sanitize.eventAttributes ) {
-					attrs = attrs.filter( sanitize );
-				}
-				if ( attrs.length ) {
-					this.attributes = attrs.map( getFrag );
-				}
-				// Process directives (proxy events, transitions, and decorators)
-				if ( proxies.length ) {
-					this.proxies = proxies.map( processDirective );
-				}
-				if ( filtered.intro ) {
-					this.intro = processDirective( filtered.intro );
-				}
-				if ( filtered.outro ) {
-					this.outro = processDirective( filtered.outro );
-				}
-				if ( filtered.decorator ) {
-					this.decorator = processDirective( filtered.decorator );
-				}
-			}
-			if ( firstToken.doctype ) {
-				this.doctype = true;
-			}
-			if ( firstToken.selfClosing ) {
-				this.selfClosing = true;
-			}
-			if ( voidElementNames.indexOf( lowerCaseTag ) !== -1 ) {
-				this.isVoid = true;
-			}
-			// if self-closing or a void element, close
-			if ( this.selfClosing || this.isVoid ) {
-				return;
-			}
-			this.siblings = siblingsByTagName[ lowerCaseTag ];
-			this.items = [];
-			next = parser.next();
-			while ( next ) {
-				// section closing mustache should also close this element, e.g.
-				// <ul>{{#items}}<li>{{content}}{{/items}}</ul>
-				if ( next.mustacheType === types.CLOSING ) {
-					break;
-				}
-				if ( next.type === types.TAG ) {
-					// closing tag
-					if ( next.closing ) {
-						// it's a closing tag, which means this element is closed...
-						if ( next.name.toLowerCase() === lowerCaseTag ) {
-							parser.pos += 1;
-						}
-						break;
-					} else if ( this.siblings && this.siblings.indexOf( next.name.toLowerCase() ) !== -1 ) {
-						break;
-					}
-				}
-				this.items.push( parser.getStub( preserveWhitespace ) );
-				next = parser.next();
-			}
-			// if we're not preserving whitespace, we can eliminate inner leading and trailing whitespace
-			if ( !preserveWhitespace ) {
-				item = this.items[ 0 ];
-				if ( item && item.type === types.TEXT ) {
-					item.text = item.text.replace( leadingWhitespace, '' );
-					if ( !item.text ) {
-						this.items.shift();
-					}
-				}
-				item = this.items[ this.items.length - 1 ];
-				if ( item && item.type === types.TEXT ) {
-					item.text = item.text.replace( trailingWhitespace, '' );
-					if ( !item.text ) {
-						this.items.pop();
-					}
-				}
-			}
-		};
-		ElementStub.prototype = {
-			toJSON: toJSON,
-			toString: toString
-		};
-		allElementNames = 'a abbr acronym address applet area b base basefont bdo big blockquote body br button caption center cite code col colgroup dd del dfn dir div dl dt em fieldset font form frame frameset h1 h2 h3 h4 h5 h6 head hr html i iframe img input ins isindex kbd label legend li link map menu meta noframes noscript object ol p param pre q s samp script select small span strike strong style sub sup textarea title tt u ul var article aside audio bdi canvas command data datagrid datalist details embed eventsource figcaption figure footer header hgroup keygen mark meter nav output progress ruby rp rt section source summary time track video wbr'.split( ' ' );
-		closedByParentClose = 'li dd rt rp optgroup option tbody tfoot tr td th'.split( ' ' );
-		onPattern = /^on[a-zA-Z]/;
-		sanitize = function( attr ) {
-			var valid = !onPattern.test( attr.name );
-			return valid;
-		};
-		return ElementStub;
-	}( config_types, config_voidElementNames, utils_warn, parse_Parser_getElement_ElementStub_utils_siblingsByTagName, parse_Parser_getElement_ElementStub_utils_filterAttributes, parse_Parser_getElement_ElementStub_utils_processDirective, parse_Parser_getElement_ElementStub_toJSON, parse_Parser_getElement_ElementStub_toString, parse_Parser_StringStub__StringStub );
-
-	var parse_Parser_getElement__getElement = function( ElementStub ) {
-
-		return function( token ) {
-			// sanitize
+			// Sanitize
 			if ( this.options.sanitize && this.options.sanitize.elements ) {
 				if ( this.options.sanitize.elements.indexOf( token.name.toLowerCase() ) !== -1 ) {
 					return null;
 				}
 			}
-			return new ElementStub( token, this, this.preserveWhitespace );
+			this.pos += 1;
+			stub = {
+				t: types.ELEMENT,
+				e: token.name
+			};
+			lowerCaseTag = stub.e.toLowerCase();
+			// if this is a <pre>/<style>/<script> element, preserve whitespace within
+			preserveWhitespace = preserveWhitespace || lowerCaseTag === 'pre' || lowerCaseTag === 'style' || lowerCaseTag === 'script';
+			if ( token.attrs ) {
+				filtered = filterAttributes( token.attrs );
+				attrs = filtered.attrs;
+				proxies = filtered.proxies;
+				// remove event attributes (e.g. onclick='doSomething()') if we're sanitizing
+				if ( this.options.sanitize && this.options.sanitize.eventAttributes ) {
+					attrs = attrs.filter( sanitize );
+				}
+				if ( attrs.length ) {
+					stub.a = getAttributeStubs( attrs );
+				}
+				// Process directives (proxy events, transitions, and decorators)
+				if ( proxies.length ) {
+					stub.v = {};
+					proxies.map( processDirective ).forEach( function( directive ) {
+						stub.v[ directive.type ] = directive.value;
+					} );
+				}
+				if ( filtered.intro ) {
+					stub.t1 = processDirective( filtered.intro ).value;
+				}
+				if ( filtered.outro ) {
+					stub.t2 = processDirective( filtered.outro ).value;
+				}
+				if ( filtered.decorator ) {
+					stub.o = processDirective( filtered.decorator ).value;
+				}
+			}
+			if ( token.doctype ) {
+				stub.y = 1;
+			}
+			// if self-closing or a void element, close
+			if ( token.selfClosing || voidElementNames.indexOf( lowerCaseTag ) !== -1 ) {
+				return stub;
+			}
+			siblings = siblingsByTagName[ lowerCaseTag ];
+			fragment = [];
+			nextToken = this.next();
+			while ( nextToken ) {
+				// section closing mustache should also close this element, e.g.
+				// <ul>{{#items}}<li>{{content}}{{/items}}</ul>
+				if ( nextToken.mustacheType === types.CLOSING ) {
+					break;
+				}
+				if ( nextToken.type === types.TAG ) {
+					// closing tag
+					if ( nextToken.closing ) {
+						// it's a closing tag, which means this element is closed...
+						if ( nextToken.name.toLowerCase() === lowerCaseTag ) {
+							this.pos += 1;
+						}
+						break;
+					} else if ( siblings && siblings.indexOf( nextToken.name.toLowerCase() ) !== -1 ) {
+						break;
+					}
+				}
+				fragment.push( this.getItem( preserveWhitespace ) );
+				nextToken = this.next();
+			}
+			if ( fragment.length ) {
+				stub.f = fragment;
+			}
+			// if we're not preserving whitespace, we can eliminate inner leading and trailing whitespace
+			// TODO tidy this up
+			if ( !preserveWhitespace && stub.f ) {
+				if ( typeof stub.f === 'string' ) {
+					stub.f = stub.f.trim();
+				} else {
+					item = stub.f[ 0 ];
+					if ( typeof item === 'string' ) {
+						stub.f[ 0 ] = item.replace( leadingWhitespace, '' );
+						if ( !stub.f[ 0 ] ) {
+							stub.f.shift();
+						}
+					}
+					item = stub.f[ stub.f.length - 1 ];
+					if ( typeof item === 'string' ) {
+						stub.f[ stub.f.length - 1 ] = item.replace( trailingWhitespace, '' );
+						if ( !stub.f[ stub.f.length - 1 ] ) {
+							stub.f.pop();
+						}
+					}
+				}
+			}
+			return stub;
 		};
-	}( parse_Parser_getElement_ElementStub__ElementStub );
 
-	var parse_Parser__Parser = function( getText, getComment, getMustache, getElement, jsonifyStubs ) {
+		function sanitize( attr ) {
+			var valid = !onPattern.test( attr.name );
+			return valid;
+		}
+	}( config_types, config_voidElementNames, parse_Parser_getElement_utils_filterAttributes, parse_Parser_getElement_utils_processDirective, parse_Parser_getElement_utils_getAttributeStubs, parse_Parser_getElement_utils_siblingsByTagName );
+
+	var parse_Parser__Parser = function( circular, getText, getComment, getMustache, getElement ) {
 
 		var Parser;
 		Parser = function( tokens, options ) {
-			var stub, stubs;
+			var item, items;
 			this.tokens = tokens || [];
 			this.pos = 0;
 			this.options = options;
 			this.preserveWhitespace = options.preserveWhitespace;
-			stubs = [];
-			while ( stub = this.getStub() ) {
-				stubs.push( stub );
+			items = [];
+			while ( item = this.getItem() ) {
+				items.push( item );
 			}
-			this.result = jsonifyStubs( stubs, options.noStringify, true );
+			this.result = items;
 		};
 		Parser.prototype = {
-			getStub: function( preserveWhitespace ) {
+			getItem: function( preserveWhitespace ) {
 				var token = this.next();
 				if ( !token ) {
 					return null;
 				}
-				return this.getText( token, this.preserveWhitespace || preserveWhitespace ) || this.getComment( token ) || this.getMustache( token ) || this.getElement( token );
+				return this.getText( token, this.preserveWhitespace || preserveWhitespace ) || this.getMustache( token ) || this.getComment( token ) || this.getElement( token );
 			},
 			getText: getText,
 			getComment: getComment,
@@ -33735,8 +33739,9 @@ define('collections', ['underscore', 'backbone', 'models'],
 				return this.tokens[ this.pos ];
 			}
 		};
+		circular.Parser = Parser;
 		return Parser;
-	}( parse_Parser_getText__getText, parse_Parser_getComment__getComment, parse_Parser_getMustache__getMustache, parse_Parser_getElement__getElement, parse_Parser_utils_jsonifyStubs );
+	}( circular, parse_Parser_getText, parse_Parser_getComment, parse_Parser_getMustache, parse_Parser_getElement__getElement );
 
 	// Ractive.parse
 	// ===============
@@ -33763,6 +33768,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 	// * t2 - outro Transition
 	// * o - decOrator
 	// * y - is doctYpe
+	// * c - is Content (e.g. of a comment node)
 	var parse__parse = function( tokenize, types, Parser ) {
 
 		var parse, onlyWhitespace, inlinePartialStart, inlinePartialEnd, parseCompoundTemplate;
@@ -33864,11 +33870,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Partial_getPartialDescriptor = function( errors, isClient, warn, isObject, partials, parse, deIndent ) {
 
-		var getPartialDescriptor, registerPartial, getPartialFromRegistry, unpack;
-		getPartialDescriptor = function( root, name ) {
+		return function getPartialDescriptor( ractive, name ) {
 			var el, partial, errorMessage;
 			// If the partial was specified on this instance, great
-			if ( partial = getPartialFromRegistry( root, name ) ) {
+			if ( partial = getPartialFromRegistry( ractive, name ) ) {
 				return partial;
 			}
 			// Does it exist on the page as a script tag?
@@ -33878,23 +33883,24 @@ define('collections', ['underscore', 'backbone', 'models'],
 					if ( !parse ) {
 						throw new Error( errors.missingParser );
 					}
-					registerPartial( parse( deIndent( el.text ), root.parseOptions ), name, partials );
+					registerPartial( parse( deIndent( el.text ), ractive.parseOptions ), name, partials );
 				}
 			}
 			partial = partials[ name ];
 			// No match? Return an empty array
 			if ( !partial ) {
 				errorMessage = 'Could not find descriptor for partial "' + name + '"';
-				if ( root.debug ) {
+				if ( ractive.debug ) {
 					throw new Error( errorMessage );
 				} else {
 					warn( errorMessage );
 				}
 				return [];
 			}
-			return unpack( partial );
+			return partial;
 		};
-		getPartialFromRegistry = function( ractive, name ) {
+
+		function getPartialFromRegistry( ractive, name ) {
 			var partial;
 			if ( ractive.partials[ name ] ) {
 				// If this was added manually to the registry, but hasn't been parsed,
@@ -33906,10 +33912,11 @@ define('collections', ['underscore', 'backbone', 'models'],
 					partial = parse( ractive.partials[ name ], ractive.parseOptions );
 					registerPartial( partial, name, ractive.partials );
 				}
-				return unpack( ractive.partials[ name ] );
+				return ractive.partials[ name ];
 			}
-		};
-		registerPartial = function( partial, name, registry ) {
+		}
+
+		function registerPartial( partial, name, registry ) {
 			var key;
 			if ( isObject( partial ) ) {
 				registry[ name ] = partial.main;
@@ -33921,15 +33928,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			} else {
 				registry[ name ] = partial;
 			}
-		};
-		unpack = function( partial ) {
-			// Unpack string, if necessary
-			if ( partial.length === 1 && typeof partial[ 0 ] === 'string' ) {
-				return partial[ 0 ];
-			}
-			return partial;
-		};
-		return getPartialDescriptor;
+		}
 	}( config_errors, config_isClient, utils_warn, utils_isObject, registries_partials, parse__parse, render_DomFragment_Partial_deIndent );
 
 	var render_DomFragment_Partial_applyIndent = function( string, indent ) {
@@ -34017,7 +34016,11 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Component_initialise_createModel_ComponentParameter = function( runloop, StringFragment ) {
 
-		var ComponentParameter = function( component, key, value ) {
+		var getValueOptions, ComponentParameter;
+		getValueOptions = {
+			parse: true
+		};
+		ComponentParameter = function( component, key, value ) {
 			this.parentFragment = component.parentFragment;
 			this.component = component;
 			this.key = key;
@@ -34027,7 +34030,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				owner: this
 			} );
 			this.selfUpdating = this.fragment.isSimple();
-			this.value = this.fragment.getValue();
+			this.value = this.fragment.getValue( getValueOptions );
 		};
 		ComponentParameter.prototype = {
 			bubble: function() {
@@ -34040,7 +34043,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				}
 			},
 			update: function() {
-				var value = this.fragment.getValue();
+				var value = this.fragment.getValue( getValueOptions );
 				this.component.instance.set( this.key, value );
 				this.value = value;
 			},
@@ -34053,9 +34056,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var render_DomFragment_Component_initialise_createModel__createModel = function( types, parseJSON, resolveRef, get, ComponentParameter ) {
 
+		var onlyWhitespace = /^\s*$/;
 		return function( component, defaultData, attributes, toBind ) {
-			var data, key, value;
-			data = {};
+			var data = {},
+				key, value;
 			// some parameters, e.g. foo="The value is {{bar}}", are 'complex' - in
 			// other words, we need to construct a string fragment to watch
 			// when they change. We store these so they can be torn down later
@@ -34078,7 +34082,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 			// If this is a static value, great
 			if ( typeof descriptor === 'string' ) {
 				parsed = parseJSON( descriptor );
-				return parsed ? parsed.value : descriptor;
+				if ( !parsed || !onlyWhitespace.test( parsed.remaining ) ) {
+					return descriptor;
+				}
+				return parsed.value;
 			}
 			// If null, we treat it as a boolean attribute (i.e. true)
 			if ( descriptor === null ) {
@@ -34227,7 +34234,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		// If there's a live query for this component type, add it
 		ancestor = component.root;
 		while ( ancestor ) {
-			if ( query = ancestor._liveComponentQueries[ component.name ] ) {
+			if ( query = ancestor._liveComponentQueries[ '_' + component.name ] ) {
 				query.push( component.instance );
 			}
 			ancestor = ancestor._parent;
@@ -34316,7 +34323,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 				if ( indexRefAlias = this.indexRefBindings[ indexRef ] ) {
 					childInstance.set( indexRefAlias, newIndex );
 				}
-				if ( query = this.root._liveComponentQueries[ this.name ] ) {
+				if ( query = this.root._liveComponentQueries[ '_' + this.name ] ) {
 					query._makeDirty();
 				}
 			},
@@ -34351,7 +34358,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			var instance, query;
 			instance = component.root;
 			do {
-				if ( query = instance._liveComponentQueries[ component.name ] ) {
+				if ( query = instance._liveComponentQueries[ '_' + component.name ] ) {
 					query._remove( component );
 				}
 			} while ( instance = instance._parent );
@@ -34364,7 +34371,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			this.type = types.COMMENT;
 			this.descriptor = options.descriptor;
 			if ( docFrag ) {
-				this.node = document.createComment( options.descriptor.f );
+				this.node = document.createComment( options.descriptor.c );
 				docFrag.appendChild( this.node );
 			}
 		};
@@ -34379,28 +34386,20 @@ define('collections', ['underscore', 'backbone', 'models'],
 				return this.node;
 			},
 			toString: function() {
-				return '<!--' + this.descriptor.f + '-->';
+				return '<!--' + this.descriptor.c + '-->';
 			}
 		};
 		return DomComment;
 	}( config_types, render_DomFragment_shared_detach );
 
-	var render_DomFragment__DomFragment = function( types, matches, Fragment, insertHtml, Text, Interpolator, Section, Triple, Element, Partial, Component, Comment, circular ) {
+	var render_DomFragment__DomFragment = function( types, matches, Fragment, Text, Interpolator, Section, Triple, Element, Partial, Component, Comment, circular ) {
 
 		var DomFragment = function( options ) {
 			if ( options.pNode ) {
 				this.docFrag = document.createDocumentFragment();
 			}
-			// if we have an HTML string, our job is easy.
-			if ( typeof options.descriptor === 'string' ) {
-				this.html = options.descriptor;
-				if ( this.docFrag ) {
-					this.nodes = insertHtml( this.html, options.pNode.tagName, options.pNode.namespaceURI, this.docFrag );
-				}
-			} else {
-				// otherwise we need to make a proper fragment
-				Fragment.init( this, options );
-			}
+			// otherwise we need to make a proper fragment
+			Fragment.init( this, options );
 		};
 		DomFragment.prototype = {
 			reassign: Fragment.reassign,
@@ -34443,7 +34442,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 					case types.COMMENT:
 						return new Comment( options, this.docFrag );
 					default:
-						throw new Error( 'Something very strange happened. Please file an issue at https://github.com/RactiveJS/Ractive/issues. Thanks!' );
+						throw new Error( 'Something very strange happened. Please file an issue at https://github.com/ractivejs/ractive/issues. Thanks!' );
 				}
 			},
 			teardown: function( destroy ) {
@@ -34485,20 +34484,10 @@ define('collections', ['underscore', 'backbone', 'models'],
 				return this.owner.findNextNode( this );
 			},
 			toString: function() {
-				var html, i, len, item;
-				if ( this.html ) {
-					return this.html;
-				}
-				html = '';
 				if ( !this.items ) {
-					return html;
+					return '';
 				}
-				len = this.items.length;
-				for ( i = 0; i < len; i += 1 ) {
-					item = this.items[ i ];
-					html += item.toString();
-				}
-				return html;
+				return this.items.join( '' );
 			},
 			find: function( selector ) {
 				var i, len, item, node, queryResult;
@@ -34590,11 +34579,11 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 		circular.DomFragment = DomFragment;
 		return DomFragment;
-	}( config_types, utils_matches, render_shared_Fragment__Fragment, render_DomFragment_shared_insertHtml, render_DomFragment_Text, render_DomFragment_Interpolator, render_DomFragment_Section__Section, render_DomFragment_Triple, render_DomFragment_Element__Element, render_DomFragment_Partial__Partial, render_DomFragment_Component__Component, render_DomFragment_Comment, circular );
+	}( config_types, utils_matches, render_shared_Fragment__Fragment, render_DomFragment_Text, render_DomFragment_Interpolator, render_DomFragment_Section__Section, render_DomFragment_Triple, render_DomFragment_Element__Element, render_DomFragment_Partial__Partial, render_DomFragment_Component__Component, render_DomFragment_Comment, circular );
 
 	var Ractive_prototype_render = function( runloop, css, DomFragment ) {
 
-		return function Ractive_prototype_render( target, callback ) {
+		return function Ractive_prototype_render( target, anchor, callback ) {
 			this._rendering = true;
 			runloop.start( this, callback );
 			// This method is part of the API for one reason only - so that it can be
@@ -34617,7 +34606,11 @@ define('collections', ['underscore', 'backbone', 'models'],
 				pNode: target
 			} );
 			if ( target ) {
-				target.appendChild( this.fragment.docFrag );
+				if ( anchor ) {
+					target.insertBefore( this.fragment.docFrag, anchor );
+				} else {
+					target.appendChild( this.fragment.docFrag );
+				}
 			}
 			// If this is *isn't* a child of a component that's in the process of rendering,
 			// it should call any `init()` methods at this point
@@ -34630,7 +34623,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 		function initChildren( instance ) {
 			var child;
-			while ( child = instance._childInitQueue.pop() ) {
+			while ( child = instance._childInitQueue.shift() ) {
 				if ( child.instance.init ) {
 					child.instance.init( child.options );
 				}
@@ -34649,11 +34642,396 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( utils_warn );
 
-	var Ractive_prototype_reset = function( Promise, runloop, clearCache, notifyDependants ) {
+	var config_registries = [ ,
+		'data',
+		'computed',
+		'adaptors',
+		'components',
+		'decorators',
+		'easing',
+		'events',
+		'interpolators',
+		'partials',
+		'transitions'
+	];
 
+	var utils_extend = function( target ) {
+		var prop, source, sources = Array.prototype.slice.call( arguments, 1 );
+		while ( source = sources.shift() ) {
+			for ( prop in source ) {
+				if ( source.hasOwnProperty( prop ) ) {
+					target[ prop ] = source[ prop ];
+				}
+			}
+		}
+		return target;
+	};
+
+	var Ractive_initialise_computations_getComputationSignature = function() {
+
+		var pattern = /\$\{([^\}]+)\}/g;
+		return function( signature ) {
+			if ( typeof signature === 'function' ) {
+				return {
+					get: signature
+				};
+			}
+			if ( typeof signature === 'string' ) {
+				return {
+					get: createFunctionFromString( signature )
+				};
+			}
+			if ( typeof signature === 'object' && typeof signature.get === 'string' ) {
+				signature = {
+					get: createFunctionFromString( signature.get ),
+					set: signature.set
+				};
+			}
+			return signature;
+		};
+
+		function createFunctionFromString( signature ) {
+			var functionBody = 'var __ractive=this;return(' + signature.replace( pattern, function( match, keypath ) {
+				return '__ractive.get("' + keypath + '")';
+			} ) + ')';
+			return new Function( functionBody );
+		}
+	}();
+
+	var Ractive_initialise_computations_Watcher = function( isEqual, registerDependant, unregisterDependant ) {
+
+		var Watcher = function( computation, keypath ) {
+			this.root = computation.ractive;
+			this.keypath = keypath;
+			this.priority = 0;
+			this.computation = computation;
+			registerDependant( this );
+		};
+		Watcher.prototype = {
+			update: function() {
+				var value;
+				value = this.root.get( this.keypath );
+				if ( !isEqual( value, this.value ) ) {
+					this.computation.bubble();
+				}
+			},
+			teardown: function() {
+				unregisterDependant( this );
+			}
+		};
+		return Watcher;
+	}( utils_isEqual, shared_registerDependant, shared_unregisterDependant );
+
+	var Ractive_initialise_computations_Computation = function( warn, runloop, set, Watcher ) {
+
+		var Computation = function( ractive, key, signature ) {
+			this.ractive = ractive;
+			this.key = key;
+			this.getter = signature.get;
+			this.setter = signature.set;
+			this.watchers = [];
+			this.update();
+		};
+		Computation.prototype = {
+			set: function( value ) {
+				if ( this.setting ) {
+					this.value = value;
+					return;
+				}
+				if ( !this.setter ) {
+					throw new Error( 'Computed properties without setters are read-only in the current version' );
+				}
+				this.setter.call( this.ractive, value );
+			},
+			update: function() {
+				var ractive, originalCaptured, result, errored;
+				ractive = this.ractive;
+				originalCaptured = ractive._captured;
+				if ( !originalCaptured ) {
+					ractive._captured = [];
+				}
+				try {
+					result = this.getter.call( ractive );
+				} catch ( err ) {
+					if ( ractive.debug ) {
+						warn( 'Failed to compute "' + this.key + '": ' + err.message || err );
+					}
+					errored = true;
+				}
+				diff( this, this.watchers, ractive._captured );
+				// reset
+				ractive._captured = originalCaptured;
+				if ( !errored ) {
+					this.setting = true;
+					this.value = result;
+					set( ractive, this.key, result );
+					this.setting = false;
+				}
+				this.deferred = false;
+			},
+			bubble: function() {
+				if ( this.watchers.length <= 1 ) {
+					this.update();
+				} else if ( !this.deferred ) {
+					runloop.addComputation( this );
+					this.deferred = true;
+				}
+			}
+		};
+
+		function diff( computation, watchers, newDependencies ) {
+			var i, watcher, keypath;
+			// remove dependencies that are no longer used
+			i = watchers.length;
+			while ( i-- ) {
+				watcher = watchers[ i ];
+				if ( !newDependencies[ watcher.keypath ] ) {
+					watchers.splice( i, 1 );
+					watchers[ watcher.keypath ] = null;
+					watcher.teardown();
+				}
+			}
+			// create references for any new dependencies
+			i = newDependencies.length;
+			while ( i-- ) {
+				keypath = newDependencies[ i ];
+				if ( !watchers[ keypath ] ) {
+					watcher = new Watcher( computation, keypath );
+					watchers.push( watchers[ keypath ] = watcher );
+				}
+			}
+		}
+		return Computation;
+	}( utils_warn, global_runloop, shared_set, Ractive_initialise_computations_Watcher );
+
+	var Ractive_initialise_computations_createComputations = function( getComputationSignature, Computation ) {
+
+		return function createComputations( ractive, computed ) {
+			var key, signature;
+			for ( key in computed ) {
+				signature = getComputationSignature( computed[ key ] );
+				ractive._computations[ key ] = new Computation( ractive, key, signature );
+			}
+		};
+	}( Ractive_initialise_computations_getComputationSignature, Ractive_initialise_computations_Computation );
+
+	var Ractive_initialise_templateParser = function( errors, isClient, parse ) {
+
+		return function( options ) {
+			return {
+				fromId: function( id ) {
+					var template;
+					if ( !isClient ) {
+						throw new Error( 'Cannot retieve template #' + id + 'as Ractive is not running in the client.' );
+					}
+					if ( id.charAt( 0 ) === '#' ) {
+						id = id.substring( 1 );
+					}
+					if ( !( template = document.getElementById( id ) ) ) {
+						throw new Error( 'Could not find template element with id #' + id );
+					}
+					return template.innerHTML;
+				},
+				parse: function( template, parseOptions ) {
+					if ( !parse ) {
+						throw new Error( errors.missingParser );
+					}
+					return parse( template, parseOptions || options );
+				},
+				isParsed: function( template ) {
+					return !( typeof template === 'string' );
+				}
+			};
+		};
+	}( config_errors, config_isClient, parse__parse );
+
+	var Ractive_initialise_initialiseTemplate = function( isClient, extend, fillGaps, isObject, TemplateParser ) {
+
+		return function( ractive, defaults, options ) {
+			var template = ractive.template,
+				templateParser, parsedTemplate;
+			templateParser = new TemplateParser( ractive.parseOptions );
+			// Parse template, if necessary
+			if ( !templateParser.isParsed( template ) ) {
+				// Assume this is an ID of a <script type='text/ractive'> tag
+				if ( template.charAt( 0 ) === '#' ) {
+					template = templateParser.fromId( template );
+				}
+				parsedTemplate = templateParser.parse( template );
+			} else {
+				parsedTemplate = template;
+			}
+			// deal with compound template
+			if ( isObject( parsedTemplate ) ) {
+				fillGaps( ractive.partials, parsedTemplate.partials );
+				parsedTemplate = parsedTemplate.main;
+			}
+			// If the template was an array with a single string member, that means
+			// we can use innerHTML - we just need to unpack it
+			if ( parsedTemplate && parsedTemplate.length === 1 && typeof parsedTemplate[ 0 ] === 'string' ) {
+				parsedTemplate = parsedTemplate[ 0 ];
+			}
+			ractive.template = parsedTemplate;
+			// Add partials to our registry
+			extend( ractive.partials, options.partials );
+		};
+	}( config_isClient, utils_extend, utils_fillGaps, utils_isObject, Ractive_initialise_templateParser );
+
+	var Ractive_initialise_initialiseRegistries = function( registries, create, extend, isArray, isObject, createComputations, initialiseTemplate, TemplateParser ) {
+
+		//Template is NOT in registryKeys, it doesn't extend b/c it's a string.
+		//We're just reusing the logic as it is mostly like a registry
+		registries = registries.concat( [ 'template' ] );
+		return initialiseRegisties;
+		//Encapsulate differences between template and other registries
+		function getExtendOptions( ractive, options ) {
+			var templateParser;
+			return {
+				// 'default' needs to be quoted as it's a keyword, and will break IE8 otherwise
+				'default': {
+					getArg: function() {
+						return;
+					},
+					extend: function( defaultValue, optionsValue ) {
+						return extend( create( defaultValue ), optionsValue );
+					},
+					initialValue: function( registry ) {
+						return ractive[ registry ];
+					}
+				},
+				template: {
+					getArg: function() {
+						if ( !templateParser ) {
+							templateParser = new TemplateParser( ractive.parseOptions );
+						}
+						return templateParser;
+					},
+					extend: function( defaultValue, optionsValue ) {
+						return optionsValue;
+					},
+					initialValue: function( registry ) {
+						return options[ registry ];
+					}
+				}
+			};
+		}
+
+		function initialiseRegisties( ractive, defaults, options, initOptions ) {
+			var extendOptions = getExtendOptions( ractive, options ),
+				registryKeys, changes;
+			initOptions = initOptions || {};
+			initOptions.newValues = initOptions.newValues || {};
+			if ( initOptions.registries ) {
+				registryKeys = initOptions.registries.filter( function( key ) {
+					return registries.indexOf( key ) > -1;
+				} );
+			} else {
+				registryKeys = registries;
+			}
+			changes = initialise();
+			if ( shouldUpdate( 'computed' ) ) {
+				createComputations( ractive, ractive.computed );
+			}
+			if ( shouldUpdate( 'template' ) ) {
+				initialiseTemplate( ractive, defaults, options );
+			}
+			return changes;
+
+			function shouldUpdate( registry ) {
+				return !initOptions.updatesOnly && ractive[ registry ] || initOptions.updatesOnly && changes.indexOf( registry ) > -1;
+			}
+
+			function initialise() {
+				//data goes first as it is primary argument to other function-based registry options
+				initialiseRegistry( 'data' );
+				if ( !ractive.data ) {
+					ractive.data = {};
+				}
+				//return the changed registries
+				return registryKeys.filter( function( registry ) {
+					return registry !== 'data';
+				} ).filter( initialiseRegistry );
+			}
+
+			function initialiseRegistry( registry ) {
+				var optionsValue = initOptions.newValues[ registry ] || options[ registry ],
+					defaultValue = ractive.constructor[ registry ] || defaults[ registry ],
+					firstArg = registry === 'data' ? optionsValue : ractive.data,
+					regOpt = extendOptions[ registry ] || extendOptions[ 'default' ],
+					initialValue = regOpt.initialValue( registry );
+				if ( typeof optionsValue === 'function' ) {
+					ractive[ registry ] = optionsValue( firstArg, options, regOpt.getArg() );
+				} else if ( defaultValue ) {
+					ractive[ registry ] = typeof defaultValue === 'function' ? defaultValue( firstArg, options, regOpt.getArg() ) || options[ registry ] : regOpt.extend( defaultValue, optionsValue );
+				} else if ( optionsValue ) {
+					ractive[ registry ] = optionsValue;
+				} else {
+					ractive[ registry ] = void 0;
+				}
+				return isChanged( ractive[ registry ], initialValue );
+			}
+
+			function isChanged( initial, current ) {
+				if ( !initial && !current ) {
+					return false;
+				}
+				if ( isEmptyObject( initial ) && isEmptyObject( current ) ) {
+					return false;
+				}
+				if ( isEmptyArray( initial ) && isEmptyArray( current ) ) {
+					return false;
+				}
+				return initial !== current;
+			}
+
+			function isEmptyObject( obj ) {
+				return isObject( obj ) && !Object.keys( obj ).length;
+			}
+
+			function isEmptyArray( arr ) {
+				return isArray( arr ) && !arr.length;
+			}
+		}
+	}( config_registries, utils_create, utils_extend, utils_isArray, utils_isObject, Ractive_initialise_computations_createComputations, Ractive_initialise_initialiseTemplate, Ractive_initialise_templateParser );
+
+	var Ractive_initialise_renderInstance = function( isClient, Promise ) {
+
+		return function renderInstance( ractive, options ) {
+			var promise, fulfilPromise;
+			// Temporarily disable transitions, if noIntro flag is set
+			ractive.transitionsEnabled = options.noIntro ? false : options.transitionsEnabled;
+			// If we're in a browser, and no element has been specified, create
+			// a document fragment to use instead
+			if ( isClient && !ractive.el ) {
+				ractive.el = document.createDocumentFragment();
+			} else if ( ractive.el && !options.append && !ractive.anchor ) {
+				ractive.el.innerHTML = '';
+			}
+			promise = new Promise( function( fulfil ) {
+				fulfilPromise = fulfil;
+			} );
+			ractive.render( ractive.el, ractive.anchor, fulfilPromise );
+			if ( options.complete ) {
+				promise = promise.then( options.complete.bind( ractive ) );
+			}
+			// reset transitionsEnabled
+			ractive.transitionsEnabled = options.transitionsEnabled;
+			return promise;
+		};
+	}( config_isClient, utils_Promise );
+
+	var Ractive_prototype_reset = function( Promise, runloop, clearCache, notifyDependants, initialiseRegistries, renderInstance ) {
+
+		var shouldRerender = [
+			'template',
+			'partials',
+			'components',
+			'decorators',
+			'events'
+		].join();
 		return function( data, callback ) {
-			var promise, fulfilPromise, wrapper;
-			if ( typeof data === 'function' ) {
+			var promise, fulfilPromise, wrapper, changes, rerender, i;
+			if ( typeof data === 'function' && !callback ) {
 				callback = data;
 				data = {};
 			} else {
@@ -34662,13 +35040,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 			if ( typeof data !== 'object' ) {
 				throw new Error( 'The reset method takes either no arguments, or an object containing new data' );
 			}
-			promise = new Promise( function( fulfil ) {
-				fulfilPromise = fulfil;
-			} );
-			if ( callback ) {
-				promise.then( callback );
-			}
-			runloop.start( this, fulfilPromise );
 			// If the root object is wrapped, try and use the wrapper's reset value
 			if ( ( wrapper = this._wrapped[ '' ] ) && wrapper.reset ) {
 				if ( wrapper.reset( data ) === false ) {
@@ -34678,13 +35049,75 @@ define('collections', ['underscore', 'backbone', 'models'],
 			} else {
 				this.data = data;
 			}
-			clearCache( this, '' );
-			notifyDependants( this, '' );
-			runloop.end();
-			this.fire( 'reset', data );
+			this.initOptions.data = this.data;
+			changes = initialiseRegistries( this, this.constructor.defaults, this.initOptions, {
+				updatesOnly: true
+			} );
+			i = changes.length;
+			while ( i-- ) {
+				if ( shouldRerender.indexOf( changes[ i ] > -1 ) ) {
+					rerender = true;
+					break;
+				}
+			}
+			if ( rerender ) {
+				this.teardown();
+				this._initing = true;
+				promise = renderInstance( this, this.initOptions );
+				//same as initialise, but should this be in then()?
+				this._initing = false;
+			} else {
+				promise = new Promise( function( fulfil ) {
+					fulfilPromise = fulfil;
+				} );
+				runloop.start( this, fulfilPromise );
+				clearCache( this, '' );
+				notifyDependants( this, '' );
+				runloop.end();
+				this.fire( 'reset', data );
+			}
+			if ( callback ) {
+				promise.then( callback );
+			}
 			return promise;
 		};
-	}( utils_Promise, global_runloop, shared_clearCache, shared_notifyDependants );
+	}( utils_Promise, global_runloop, shared_clearCache, shared_notifyDependants, Ractive_initialise_initialiseRegistries, Ractive_initialise_renderInstance );
+
+	var Ractive_prototype_resetTemplate = function( Promise, initialiseRegistries, renderInstance ) {
+
+		return function( template, callback ) {
+			var promise, changes, options = {
+				updatesOnly: true,
+				registries: [
+					'template',
+					'partials'
+				]
+			};
+			if ( typeof template === 'function' && !callback ) {
+				callback = template;
+				template = void 0;
+			}
+			if ( template ) {
+				options.newValues = {
+					template: template
+				};
+			}
+			changes = initialiseRegistries( this, this.constructor.defaults, this.initOptions, options );
+			if ( changes.length ) {
+				this.teardown();
+				this._initing = true;
+				promise = renderInstance( this, this.initOptions );
+				//same as initialise, but should this be in then()?
+				this._initing = false;
+			} else {
+				promise = Promise.resolve();
+			}
+			if ( callback ) {
+				promise.then( callback );
+			}
+			return promise;
+		};
+	}( utils_Promise, Ractive_initialise_initialiseRegistries, Ractive_initialise_renderInstance );
 
 	var Ractive_prototype_set = function( runloop, isObject, normaliseKeypath, Promise, set ) {
 
@@ -34891,7 +35324,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		}
 	}( shared_getValueFromCheckboxes, utils_arrayContentsMatch, utils_isEqual );
 
-	var Ractive_prototype__prototype = function( add, animate, detach, find, findAll, findAllComponents, findComponent, fire, get, insert, merge, observe, off, on, render, renderHTML, reset, set, subtract, teardown, toHTML, toggle, update, updateModel ) {
+	var Ractive_prototype__prototype = function( add, animate, detach, find, findAll, findAllComponents, findComponent, fire, get, insert, merge, observe, off, on, render, renderHTML, reset, resetTemplate, set, subtract, teardown, toHTML, toggle, update, updateModel ) {
 
 		return {
 			add: add,
@@ -34911,6 +35344,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			render: render,
 			renderHTML: renderHTML,
 			reset: reset,
+			resetTemplate: resetTemplate,
 			set: set,
 			subtract: subtract,
 			teardown: teardown,
@@ -34919,7 +35353,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 			update: update,
 			updateModel: updateModel
 		};
-	}( Ractive_prototype_add, Ractive_prototype_animate__animate, Ractive_prototype_detach, Ractive_prototype_find, Ractive_prototype_findAll, Ractive_prototype_findAllComponents, Ractive_prototype_findComponent, Ractive_prototype_fire, Ractive_prototype_get, Ractive_prototype_insert, Ractive_prototype_merge__merge, Ractive_prototype_observe__observe, Ractive_prototype_off, Ractive_prototype_on, Ractive_prototype_render, Ractive_prototype_renderHTML, Ractive_prototype_reset, Ractive_prototype_set, Ractive_prototype_subtract, Ractive_prototype_teardown, Ractive_prototype_toHTML, Ractive_prototype_toggle, Ractive_prototype_update, Ractive_prototype_updateModel );
+	}( Ractive_prototype_add, Ractive_prototype_animate__animate, Ractive_prototype_detach, Ractive_prototype_find, Ractive_prototype_findAll, Ractive_prototype_findAllComponents, Ractive_prototype_findComponent, Ractive_prototype_fire, Ractive_prototype_get, Ractive_prototype_insert, Ractive_prototype_merge__merge, Ractive_prototype_observe__observe, Ractive_prototype_off, Ractive_prototype_on, Ractive_prototype_render, Ractive_prototype_renderHTML, Ractive_prototype_reset, Ractive_prototype_resetTemplate, Ractive_prototype_set, Ractive_prototype_subtract, Ractive_prototype_teardown, Ractive_prototype_toHTML, Ractive_prototype_toggle, Ractive_prototype_update, Ractive_prototype_updateModel );
 
 	var registries_components = {};
 
@@ -34969,30 +35403,6 @@ define('collections', ['underscore', 'backbone', 'models'],
 			return v.toString( 16 );
 		} );
 	};
-
-	var utils_extend = function( target ) {
-		var prop, source, sources = Array.prototype.slice.call( arguments, 1 );
-		while ( source = sources.shift() ) {
-			for ( prop in source ) {
-				if ( source.hasOwnProperty( prop ) ) {
-					target[ prop ] = source[ prop ];
-				}
-			}
-		}
-		return target;
-	};
-
-	var config_registries = [
-		'adaptors',
-		'components',
-		'decorators',
-		'easing',
-		'events',
-		'interpolators',
-		'partials',
-		'transitions',
-		'data'
-	];
 
 	var extend_utils_transformCss = function() {
 
@@ -35207,155 +35617,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 		};
 	}( config_errors, parse__parse );
 
-	var Ractive_initialise_computations_getComputationSignature = function() {
-
-		var pattern = /\$\{([^\}]+)\}/g;
-		return function( signature ) {
-			if ( typeof signature === 'function' ) {
-				return {
-					get: signature
-				};
-			}
-			if ( typeof signature === 'string' ) {
-				return {
-					get: createFunctionFromString( signature )
-				};
-			}
-			if ( typeof signature === 'object' && typeof signature.get === 'string' ) {
-				signature = {
-					get: createFunctionFromString( signature.get ),
-					set: signature.set
-				};
-			}
-			return signature;
-		};
-
-		function createFunctionFromString( signature ) {
-			var functionBody = 'var __ractive=this;return(' + signature.replace( pattern, function( match, keypath ) {
-				return '__ractive.get("' + keypath + '")';
-			} ) + ')';
-			return new Function( functionBody );
-		}
-	}();
-
-	var Ractive_initialise_computations_Watcher = function( isEqual, registerDependant, unregisterDependant ) {
-
-		var Watcher = function( computation, keypath ) {
-			this.root = computation.ractive;
-			this.keypath = keypath;
-			this.priority = 0;
-			this.computation = computation;
-			registerDependant( this );
-		};
-		Watcher.prototype = {
-			update: function() {
-				var value;
-				value = this.root.get( this.keypath );
-				if ( !isEqual( value, this.value ) ) {
-					this.computation.bubble();
-				}
-			},
-			teardown: function() {
-				unregisterDependant( this );
-			}
-		};
-		return Watcher;
-	}( utils_isEqual, shared_registerDependant, shared_unregisterDependant );
-
-	var Ractive_initialise_computations_Computation = function( warn, runloop, set, Watcher ) {
-
-		var Computation = function( ractive, key, signature ) {
-			this.ractive = ractive;
-			this.key = key;
-			this.getter = signature.get;
-			this.setter = signature.set;
-			this.watchers = [];
-			this.update();
-		};
-		Computation.prototype = {
-			set: function( value ) {
-				if ( this.setting ) {
-					this.value = value;
-					return;
-				}
-				if ( !this.setter ) {
-					throw new Error( 'Computed properties without setters are read-only in the current version' );
-				}
-				this.setter.call( this.ractive, value );
-			},
-			update: function() {
-				var ractive, originalCaptured, result, errored;
-				ractive = this.ractive;
-				originalCaptured = ractive._captured;
-				if ( !originalCaptured ) {
-					ractive._captured = [];
-				}
-				try {
-					result = this.getter.call( ractive );
-				} catch ( err ) {
-					if ( ractive.debug ) {
-						warn( 'Failed to compute "' + this.key + '": ' + err.message || err );
-					}
-					errored = true;
-				}
-				diff( this, this.watchers, ractive._captured );
-				// reset
-				ractive._captured = originalCaptured;
-				if ( !errored ) {
-					this.setting = true;
-					this.value = result;
-					set( ractive, this.key, result );
-					this.setting = false;
-				}
-				this.deferred = false;
-			},
-			bubble: function() {
-				if ( this.watchers.length <= 1 ) {
-					this.update();
-				} else if ( !this.deferred ) {
-					runloop.addComputation( this );
-					this.deferred = true;
-				}
-			}
-		};
-
-		function diff( computation, watchers, newDependencies ) {
-			var i, watcher, keypath;
-			// remove dependencies that are no longer used
-			i = watchers.length;
-			while ( i-- ) {
-				watcher = watchers[ i ];
-				if ( !newDependencies[ watcher.keypath ] ) {
-					watchers.splice( i, 1 );
-					watchers[ watcher.keypath ] = null;
-					watcher.teardown();
-				}
-			}
-			// create references for any new dependencies
-			i = newDependencies.length;
-			while ( i-- ) {
-				keypath = newDependencies[ i ];
-				if ( !watchers[ keypath ] ) {
-					watcher = new Watcher( computation, keypath );
-					watchers.push( watchers[ keypath ] = watcher );
-				}
-			}
-		}
-		return Computation;
-	}( utils_warn, global_runloop, shared_set, Ractive_initialise_computations_Watcher );
-
-	var Ractive_initialise_computations_createComputations = function( getComputationSignature, Computation ) {
-
-		return function createComputations( ractive, computed ) {
-			var key, signature;
-			for ( key in computed ) {
-				signature = getComputationSignature( computed[ key ] );
-				ractive._computations[ key ] = new Computation( ractive, key, signature );
-			}
-		};
-	}( Ractive_initialise_computations_getComputationSignature, Ractive_initialise_computations_Computation );
-
-	var Ractive_initialise = function( isClient, errors, initOptions, registries, warn, create, extend, fillGaps, defineProperties, getElement, isObject, isArray, getGuid, Promise, magicAdaptor, parse, createComputations ) {
+	var Ractive_initialise = function( initOptions, warn, create, extend, defineProperties, getElement, isArray, getGuid, magicAdaptor, initialiseRegistries, renderInstance ) {
 
 		var flags = [
 			'adapt',
@@ -35367,21 +35629,27 @@ define('collections', ['underscore', 'backbone', 'models'],
 			'isolated'
 		];
 		return function initialiseRactiveInstance( ractive, options ) {
-			var defaults, template, templateEl, parsedTemplate, promise, fulfilPromise, computed;
-			if ( isArray( options.adaptors ) ) {
-				warn( 'The `adaptors` option, to indicate which adaptors should be used with a given Ractive instance, has been deprecated in favour of `adapt`. See [TODO] for more information' );
-				options.adapt = options.adaptors;
-				delete options.adaptors;
-			}
-			// Options
-			// -------
-			defaults = ractive.constructor.defaults;
+			var defaults = ractive.constructor.defaults;
+			//allow empty constructor options and save for reset
+			ractive.initOptions = options = options || {};
+			setOptionsAndFlags( ractive, defaults, options );
+			//sets ._initing = true
+			initialiseProperties( ractive, options );
+			initialiseRegistries( ractive, defaults, options );
+			renderInstance( ractive, options );
+			// end init sequence
+			ractive._initing = false;
+		};
+
+		function setOptionsAndFlags( ractive, defaults, options ) {
+			deprecate( defaults );
+			deprecate( options );
 			initOptions.keys.forEach( function( key ) {
 				if ( options[ key ] === undefined ) {
 					options[ key ] = defaults[ key ];
 				}
 			} );
-			// options
+			// flag options
 			flags.forEach( function( flag ) {
 				ractive[ flag ] = options[ flag ];
 			} );
@@ -35389,11 +35657,39 @@ define('collections', ['underscore', 'backbone', 'models'],
 			if ( typeof ractive.adapt === 'string' ) {
 				ractive.adapt = [ ractive.adapt ];
 			}
+			validate( ractive, options );
+		}
+
+		function deprecate( options ) {
+			if ( isArray( options.adaptors ) ) {
+				warn( 'The `adaptors` option, to indicate which adaptors should be used with a given Ractive instance, has been deprecated in favour of `adapt`. See [TODO] for more information' );
+				options.adapt = options.adaptors;
+				delete options.adaptors;
+			}
+			if ( options.eventDefinitions ) {
+				// TODO remove support
+				warn( 'ractive.eventDefinitions has been deprecated in favour of ractive.events. Support will be removed in future versions' );
+				options.events = options.eventDefinitions;
+			}
+		}
+
+		function validate( ractive, options ) {
+			var anchor;
 			if ( ractive.magic && !magicAdaptor ) {
 				throw new Error( 'Getters and setters (magic mode) are not supported in this browser' );
 			}
-			// Initialisation
-			// --------------
+			if ( options.el ) {
+				ractive.el = getElement( options.el );
+				if ( !ractive.el && ractive.debug ) {
+					throw new Error( 'Could not find container element' );
+				}
+				if ( anchor = getElement( options.el.anchor ) ) {
+					ractive.anchor = anchor;
+				}
+			}
+		}
+
+		function initialiseProperties( ractive, options ) {
 			// We use Object.defineProperties (where possible) as these should be read-only
 			defineProperties( ractive, {
 				_initing: {
@@ -35472,6 +35768,14 @@ define('collections', ['underscore', 'backbone', 'models'],
 					value: []
 				}
 			} );
+			//Save parse specific options
+			ractive.parseOptions = {
+				preserveWhitespace: options.preserveWhitespace,
+				sanitize: options.sanitize,
+				stripComments: options.stripComments,
+				delimiters: options.delimiters,
+				tripleDelimiters: options.tripleDelimiters
+			};
 			// If this is a component, store a reference to the parent
 			if ( options._parent && options._component ) {
 				defineProperties( ractive, {
@@ -35485,96 +35789,8 @@ define('collections', ['underscore', 'backbone', 'models'],
 				// And store a reference to the instance on the component
 				options._component.instance = ractive;
 			}
-			if ( options.el ) {
-				ractive.el = getElement( options.el );
-				if ( !ractive.el && ractive.debug ) {
-					throw new Error( 'Could not find container element' );
-				}
-			}
-			// Create local registry objects, with the global registries as prototypes
-			if ( options.eventDefinitions ) {
-				// TODO remove support
-				warn( 'ractive.eventDefinitions has been deprecated in favour of ractive.events. Support will be removed in future versions' );
-				options.events = options.eventDefinitions;
-			}
-			registries.forEach( function( registry ) {
-				if ( ractive.constructor[ registry ] ) {
-					ractive[ registry ] = extend( create( ractive.constructor[ registry ] ), options[ registry ] );
-				} else if ( options[ registry ] ) {
-					ractive[ registry ] = options[ registry ];
-				}
-			} );
-			// Special case
-			if ( !ractive.data ) {
-				ractive.data = {};
-			}
-			// Set up any computed values
-			computed = defaults.computed ? extend( create( defaults.computed ), options.computed ) : options.computed;
-			if ( computed ) {
-				createComputations( ractive, computed );
-			}
-			// Parse template, if necessary
-			template = options.template;
-			if ( typeof template === 'string' ) {
-				if ( !parse ) {
-					throw new Error( errors.missingParser );
-				}
-				if ( template.charAt( 0 ) === '#' && isClient ) {
-					// assume this is an ID of a <script type='text/ractive'> tag
-					templateEl = document.getElementById( template.substring( 1 ) );
-					if ( templateEl ) {
-						parsedTemplate = parse( templateEl.innerHTML, options );
-					} else {
-						throw new Error( 'Could not find template element (' + template + ')' );
-					}
-				} else {
-					parsedTemplate = parse( template, options );
-				}
-			} else {
-				parsedTemplate = template;
-			}
-			// deal with compound template
-			if ( isObject( parsedTemplate ) ) {
-				fillGaps( ractive.partials, parsedTemplate.partials );
-				parsedTemplate = parsedTemplate.main;
-			}
-			// If the template was an array with a single string member, that means
-			// we can use innerHTML - we just need to unpack it
-			if ( parsedTemplate && parsedTemplate.length === 1 && typeof parsedTemplate[ 0 ] === 'string' ) {
-				parsedTemplate = parsedTemplate[ 0 ];
-			}
-			ractive.template = parsedTemplate;
-			// Add partials to our registry
-			extend( ractive.partials, options.partials );
-			ractive.parseOptions = {
-				preserveWhitespace: options.preserveWhitespace,
-				sanitize: options.sanitize,
-				stripComments: options.stripComments
-			};
-			// Temporarily disable transitions, if noIntro flag is set
-			ractive.transitionsEnabled = options.noIntro ? false : options.transitionsEnabled;
-			// If we're in a browser, and no element has been specified, create
-			// a document fragment to use instead
-			if ( isClient && !ractive.el ) {
-				ractive.el = document.createDocumentFragment();
-			}
-			// If the target contains content, and `append` is falsy, clear it
-			if ( ractive.el && !options.append ) {
-				ractive.el.innerHTML = '';
-			}
-			promise = new Promise( function( fulfil ) {
-				fulfilPromise = fulfil;
-			} );
-			ractive.render( ractive.el, fulfilPromise );
-			if ( options.complete ) {
-				promise.then( options.complete.bind( ractive ) );
-			}
-			// reset transitionsEnabled
-			ractive.transitionsEnabled = options.transitionsEnabled;
-			// end init sequence
-			ractive._initing = false;
-		};
-	}( config_isClient, config_errors, config_initOptions, config_registries, utils_warn, utils_create, utils_extend, utils_fillGaps, utils_defineProperties, utils_getElement, utils_isObject, utils_isArray, utils_getGuid, utils_Promise, shared_get_magicAdaptor, parse__parse, Ractive_initialise_computations_createComputations );
+		}
+	}( config_initOptions, utils_warn, utils_create, utils_extend, utils_defineProperties, utils_getElement, utils_isArray, utils_getGuid, shared_get_magicAdaptor, Ractive_initialise_initialiseRegistries, Ractive_initialise_renderInstance );
 
 	var extend_initChildInstance = function( initOptions, wrapMethod, initialise ) {
 
@@ -35662,6 +35878,7 @@ define('collections', ['underscore', 'backbone', 'models'],
 
 	var Ractive__Ractive = function( initOptions, svg, defineProperties, proto, partialRegistry, adaptorRegistry, componentsRegistry, easingRegistry, interpolatorsRegistry, Promise, extend, parse, initialise, circular ) {
 
+		// Main Ractive required object
 		var Ractive = function( options ) {
 			initialise( this, options );
 		};
@@ -36609,10 +36826,11 @@ define('text!templates/loading.mustache',[],function () { return '<div class="lo
  * things at instantian, like templates
  */
 define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive-events-tap',
+  'helpers',
   'text!templates/application.mustache',
   'text!templates/loading.mustache'
 ],
-  function($, _, Ractive, RactiveB, RactiveEventTap, tApplication, tLoading) {
+  function($, _, Ractive, RactiveB, RactiveEventTap, helpers, tApplication, tLoading) {
   var views = {};
 
   // Base view to extend from
@@ -36637,12 +36855,16 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
       // once the candidates are loaded
       this.observe('candidates', function(n, o) {
         if (!_.isUndefined(n) && !thisView.stuck) {
+          // Hack around IE8 being stupid.  The wait is just an insurance that
+          // the DOM has been loaded.
+          var wait = (helpers.isMSIE() <= 8) ? 1200 : 500;
+
           _.delay(function() {
             $(thisView.el).find('.top-container').mpStick({});
-          }, 500);
+          }, wait);
           thisView.stuck = true;
         }
-      });
+      }, { defer: true });
     }
   });
 
@@ -36651,7 +36873,7 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
 });
 
 
-define('text!../data/preferences.json',[],function () { return '{"Candidate guide to Hennepin County 3rd Commissioner Primary":{"Questions":[{"category":"Partisanship","question":"Do you want a candidate who sought DFL endorsement?","eliminatesony":"carney, reuer","eliminatesonn":"greene, mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":1},{"category":"Endorsements","question":"Do you want a candidate endorsed by the GOP?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":2},{"category":"Endorsements","question":"Do you want a candidate endorsed by all members of the St. Louis Park City Council and State Rep. Ryan Winkler and State Sen. Ron Latz?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":3},{"category":"Endorsements","question":"Do you want a candidate endorsed by Stonewall DFL, Hennepin Commissioner Linda Higgins, State Rep. Frank Hornstein, School board members Mammen, Monserrate and Gagnon?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":4},{"category":"Endorsements","question":"Do you want a candidate endorsed by former NRP director Bob Miller, State Rep. Joe Mullery and Minneapolis Parks Commissioner Jon Olson? ","eliminatesony":"mavity, carney, reuer, schweigert, greene","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":5},{"category":"Endorsements","question":"Do you want a candidate endorsed by County Attoney Mike Freeman and State Reps. Karen Clark & Susan Allen?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":6},{"category":"Union support","question":"Do you want a candidate with union support?","eliminatesony":"greene, carney, reuer","eliminatesonn":"mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":7},{"category":"Union support","question":"Do you want a candidate supported by AFSCME, Teamsters, and Hennepin County Sheriff’s Deputies?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":8},{"category":"Union support","question":"Do you want a candidate supported by the Carpenters, Building Trades, Laborers, and Locomotive Workers?","eliminatesony":"mavity, greene, carney, reuer, schweigert","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":9},{"category":"Union support","question":"Do you want a candidate supported by the Sheet Metal Workers?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":10},{"category":"Elected experience","question":"Do you want a candidate with previous elected experience?","eliminatesony":"carney, reuer, schweigert","eliminatesonn":"greene, kelash, mavity","unknownstance":"","na":"","rowNumber":11},{"category":"Southwest LRT","question":"Do you want a candidate who would replace Southwest LRT with busways?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":12},{"category":"Residence","question":"Do you want a candidate who lives in Minneapolis?","eliminatesony":"mavity","eliminatesonn":"greene, carney, reuer, kelash, schweigert","unknownstance":"","na":"","rowNumber":13},{"category":"Residence","question":"Do you want a candidate who lives in St. Louis Park?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":14},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who endorsed Mark Andrew for 2013 Minneapolis mayor?","eliminatesony":"carney, reuer, schweigert, mavity","eliminatesonn":"greene, kelash","unknownstance":"","na":"","rowNumber":15},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who voted Betsy Hodges first in the 2013 Minneapolis mayoral election?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":16},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who voted Cam Winton first in the 2013 Minneapolis mayoral election?","eliminatesony":"mavity, greene, carney, kelash, schweigert","eliminatesonn":"reuer","unknownstance":"","na":"","rowNumber":17},{"category":"Experience","question":"Do you want a candidate who served on the boards of OutFront Minnesota and Minnesotans United for All Families?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":18},{"category":"Experience","question":"Do you want a candidate who served on the Hennepin County Workforce Board?","eliminatesony":"greene, carney, reuer, schweigert","eliminatesonn":"mavity, kelash","unknownstance":"","na":"","rowNumber":19},{"category":"Experience","question":"Do you want a candidate who has worked as a Hennepin County prosecutor?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":20}],"Candidates":[{"candidateid":"carney","name":"Bob Carney Jr.","last":"Carney","profileurl":"http://www.minnpost.com/community-voices/2014/04/hennepin-commissioner-candidate-demand-southwest-lrt-alternatives","rowNumber":1},{"candidateid":"reuer","name":"Bob Reuer","last":"Reuer","profileurl":"","rowNumber":2},{"candidateid":"greene","name":"Marion Greene","last":"Greene","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-marion-greene","rowNumber":3},{"candidateid":"mavity","name":"Anne Mavity","last":"Mavity","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-anne-mavity","rowNumber":4},{"candidateid":"kelash","name":"Ken Kelash","last":"Kelash","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ken-kelash","rowNumber":5},{"candidateid":"schweigert","name":"Ben Schweigert","last":"Schweigert","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ben-schweigert","rowNumber":6}]}}';});
+define('text!../data/preferences.json',[],function () { return '{"Candidate guide to Hennepin County 3rd Commissioner Primary":{"Questions":[{"category":"Partisanship","question":"Do you want a candidate who sought DFL endorsement?","eliminatesony":"carney, reuer","eliminatesonn":"greene, mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":1},{"category":"Endorsements","question":"Do you want a candidate endorsed by the GOP?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":2},{"category":"Endorsements","question":"Do you want a candidate endorsed by the entire St. Louis Park City Council, State Rep. Ryan Winkler and State Sen. Ron Latz?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":3},{"category":"Endorsements","question":"Do you want a candidate endorsed by Stonewall DFL, Hennepin Commissioner Higgins, State Rep. Hornstein, Minneapolis school board members Mammen, Monserrate & Gagnon?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":4},{"category":"Endorsements","question":"Do you want a candidate endorsed by former NRP director Bob Miller, State Rep. Joe Mullery and Minneapolis Parks Commissioner Jon Olson? ","eliminatesony":"mavity, carney, reuer, schweigert, greene","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":5},{"category":"Endorsements","question":"Do you want a candidate endorsed by County Attoney Mike Freeman and State Reps. Karen Clark & Susan Allen?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":6},{"category":"Union support","question":"Do you want a candidate with union support?","eliminatesony":"greene, carney, reuer","eliminatesonn":"mavity, kelash, schweigert","unknownstance":"","na":"","rowNumber":7},{"category":"Union support","question":"Do you want a candidate supported by AFSCME, Teamsters, and Hennepin County Sheriff’s Deputies?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":8},{"category":"Union support","question":"Do you want a candidate supported by the Carpenters, Building Trades, Laborers, and Locomotive Workers?","eliminatesony":"mavity, greene, carney, reuer, schweigert","eliminatesonn":"kelash","unknownstance":"","na":"","rowNumber":9},{"category":"Union support","question":"Do you want a candidate supported by the Sheet Metal Workers?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":10},{"category":"Elected experience","question":"Do you want a candidate with previous elected experience?","eliminatesony":"carney, reuer, schweigert","eliminatesonn":"greene, kelash, mavity","unknownstance":"","na":"","rowNumber":11},{"category":"Southwest LRT","question":"Do you want a candidate who would replace Southwest LRT with busways?","eliminatesony":"greene, mavity, kelash, schweigert, reuer","eliminatesonn":"carney","unknownstance":"","na":"","rowNumber":12},{"category":"Residence","question":"Do you want a candidate who lives in Minneapolis?","eliminatesony":"mavity","eliminatesonn":"greene, carney, reuer, kelash, schweigert","unknownstance":"","na":"","rowNumber":13},{"category":"Residence","question":"Do you want a candidate who lives in St. Louis Park?","eliminatesony":"greene, carney, reuer, kelash, schweigert","eliminatesonn":"mavity","unknownstance":"","na":"","rowNumber":14},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who endorsed Mark Andrew for 2013 Minneapolis mayor?","eliminatesony":"carney, reuer, schweigert, mavity","eliminatesonn":"greene, kelash","unknownstance":"","na":"","rowNumber":15},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who voted Betsy Hodges first in the 2013 Minneapolis mayoral election?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":16},{"category":"Minneapolis mayoral election","question":"Do you want a candidate who voted Cam Winton first in the 2013 Minneapolis mayoral election?","eliminatesony":"mavity, greene, carney, kelash, schweigert","eliminatesonn":"reuer","unknownstance":"","na":"","rowNumber":17},{"category":"Experience","question":"Do you want a candidate who served on the boards of OutFront Minnesota and Minnesotans United for All Families?","eliminatesony":"mavity, carney, reuer, kelash, schweigert","eliminatesonn":"greene","unknownstance":"","na":"","rowNumber":18},{"category":"Experience","question":"Do you want a candidate who served on the Hennepin County Workforce Board?","eliminatesony":"greene, carney, reuer, schweigert","eliminatesonn":"mavity, kelash","unknownstance":"","na":"","rowNumber":19},{"category":"Experience","question":"Do you want a candidate who has worked as a Hennepin County prosecutor?","eliminatesony":"mavity, greene, carney, reuer, kelash","eliminatesonn":"schweigert","unknownstance":"","na":"","rowNumber":20}],"Candidates":[{"candidateid":"carney","name":"Bob Carney Jr.","last":"Carney","profileurl":"http://www.minnpost.com/community-voices/2014/04/hennepin-commissioner-candidate-demand-southwest-lrt-alternatives","rowNumber":1},{"candidateid":"reuer","name":"Bob Reuer","last":"Reuer","profileurl":"","rowNumber":2},{"candidateid":"greene","name":"Marion Greene","last":"Greene","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-marion-greene","rowNumber":3},{"candidateid":"mavity","name":"Anne Mavity","last":"Mavity","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-anne-mavity","rowNumber":4},{"candidateid":"kelash","name":"Ken Kelash","last":"Kelash","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ken-kelash","rowNumber":5},{"candidateid":"schweigert","name":"Ben Schweigert","last":"Schweigert","profileurl":"http://www.minnpost.com/politics-policy/2014/04/hennepin-county-commissioner-election-interview-ben-schweigert","rowNumber":6}]}}';});
 
 /**
  * Main application file for: minnpost-hennepin-county-3rd-commissioner-primary-candidates

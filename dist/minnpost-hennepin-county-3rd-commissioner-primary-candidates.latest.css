@@ -17,6 +17,12 @@ body .node-unpublished {
   background-repeat: no-repeat;
 }
 
+.browser-upgrade-note {
+  margin: 2em 3em;
+  background-color: #EBEBEB;
+  padding: 2em;
+}
+
 .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .application-container {
   padding-top: 3em;
 }
@@ -78,6 +84,9 @@ body .node-unpublished {
 }
 .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .question-list .question .question-options {
   margin-left: 1em;
+}
+.mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .top-container.stuck.top {
+  border-bottom/*\**/: 2px solid #676767 \9;
 }
 @media screen and (max-width: 700px) {
   .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .top-container .candidate-list .candidate .candidate-name {
