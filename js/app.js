@@ -7,12 +7,12 @@
 
 // Create main application
 define('minnpost-hennepin-county-3rd-commissioner-primary-candidates', [
-  'jquery', 'underscore', 'leaflet',
-  'mpConfig', 'mpFormatters', 'mpMaps', 'mpNav',
+  'jquery', 'underscore',
+  'mpConfig', 'mpFormatters', 'mpNav',
   'helpers', 'models', 'collections', 'views',
   'text!../data/preferences.json'
 ], function(
-  $, _, L, mpConfig, mpFormatters, mpMaps, mpNav,
+  $, _, mpConfig, mpFormatters, mpNav,
   helpers, models, collections, views,
   tDataPreferences
   ) {

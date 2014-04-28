@@ -16,8 +16,7 @@
   "dependencies": {
     "backbone": "~1.1.2",
     "ractive-backbone": "master",
-    "leaflet": "~0.7.2",
-    "ractive": "http://cdn.ractivejs.org/edge/ractive-legacy.js",
+    "ractive": "http://cdn.ractivejs.org/releases/0.4.0/ractive-legacy.js",
     "ractive-events-tap": "~0.1.1",
     "requirejs": "~2.1.11",
     "almond": "~0.2.9",
@@ -87,19 +86,6 @@
       ],
       "returns": "RactiveEventsTap"
     },
-    "leaflet": {
-      "rname": "leaflet",
-      "js": [
-        "leaflet/dist/leaflet-src"
-      ],
-      "css": [
-        "leaflet/dist/leaflet"
-      ],
-      "images": [
-        "leaflet/dist/images"
-      ],
-      "returns": "L"
-    },
     "minnpost-styles": {
       "rname": "mpStyles",
       "css": [
@@ -123,13 +109,6 @@
         "minnpost-styles/dist/minnpost-styles.formatters"
       ],
       "returns": "mpFormatters"
-    },
-    "mpMaps": {
-      "rname": "mpMaps",
-      "js": [
-        "minnpost-styles/dist/minnpost-styles.maps"
-      ],
-      "returns": "mpMaps"
     },
     "mpNav": {
       "rname": "mpNav",

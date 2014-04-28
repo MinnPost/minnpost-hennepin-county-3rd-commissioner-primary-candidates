@@ -2,7 +2,7 @@
 
 A candidate guide to Hennepin County 3rd Commissioner Primary on April 29, 2014.
 
-You can see this project in action at [MinnPost](http://www.minnpost.com/data/2014/04/last-minute-hennepin-county-candidate-picking-tool)].
+You can see this project in action at [MinnPost](http://www.minnpost.com/data/2014/04/last-minute-hennepin-county-candidate-picking-tool).
 
 *Unless otherwise noted, MinnPost projects on [Github](https://github.com/minnpost) are story-driven and meant for transparency sake and not focused on re-use.  For a list of our more reusable projects, go to [code.minnpost.com](http://code.minnpost.com).*
 
