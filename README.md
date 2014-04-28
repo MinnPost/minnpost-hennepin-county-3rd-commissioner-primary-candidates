@@ -120,6 +120,9 @@ There are to main ways to include the necessary HTML in a page in order to run t
 *List any hacks used in this project, such as forked repos.  Link to pull request or repo and issue.*
 
 * Ran into some issues with the Grunt GSSPull plugin.  See [pull request](https://github.com/motherjones/grunt-gss-pull/pull/3).
+* Using master on Ractive-Backbone plugin as the reference to its dependencies changed.
+* Using master on MinnPost Styles.
+* Ractive is no longer including other builds in the bower install, so we have to refer to their CDN version.  Very sad.  Cannot seem to find a specific version link, so using `edge` which will probably change.  More sadness.
 
 ## About Us
 

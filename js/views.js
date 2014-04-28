@@ -6,10 +6,11 @@
  * things at instantian, like templates
  */
 define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive-events-tap',
+  'helpers',
   'text!templates/application.mustache',
   'text!templates/loading.mustache'
 ],
-  function($, _, Ractive, RactiveB, RactiveEventTap, tApplication, tLoading) {
+  function($, _, Ractive, RactiveB, RactiveEventTap, helpers, tApplication, tLoading) {
   var views = {};
 
   // Base view to extend from
@@ -34,12 +35,16 @@ define('views', ['jquery', 'underscore', 'ractive', 'ractive-backbone', 'ractive
       // once the candidates are loaded
       this.observe('candidates', function(n, o) {
         if (!_.isUndefined(n) && !thisView.stuck) {
+          // Hack around IE8 being stupid.  The wait is just an insurance that
+          // the DOM has been loaded.
+          var wait = (helpers.isMSIE() <= 8) ? 1200 : 500;
+
           _.delay(function() {
             $(thisView.el).find('.top-container').mpStick({});
-          }, 500);
+          }, wait);
           thisView.stuck = true;
         }
-      });
+      }, { defer: true });
     }
   });
 

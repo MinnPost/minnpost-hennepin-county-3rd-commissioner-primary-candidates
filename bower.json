@@ -17,7 +17,7 @@
     "backbone": "~1.1.2",
     "ractive-backbone": "master",
     "leaflet": "~0.7.2",
-    "ractive": "~0.4.0",
+    "ractive": "http://cdn.ractivejs.org/edge/ractive-legacy.js",
     "ractive-events-tap": "~0.1.1",
     "requirejs": "~2.1.11",
     "almond": "~0.2.9",
@@ -69,7 +69,7 @@
     "ractive": {
       "rname": "ractive",
       "js": [
-        "ractive/ractive"
+        "ractive/index"
       ],
       "returns": "Ractive"
     },

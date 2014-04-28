@@ -7,6 +7,12 @@ body .node-unpublished {
   background-repeat: no-repeat;
 }
 
+.browser-upgrade-note {
+  margin: 2em 3em;
+  background-color: #EBEBEB;
+  padding: 2em;
+}
+
 // Wrap everything for specificity
 .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container {
 
@@ -94,6 +100,9 @@ body .node-unpublished {
       }
     }
   }
+
+  // IE8 hacks
+  .top-container.stuck.top { border-bottom/*\**/: 2px solid #676767\9; }
 
 
   // Some breakpoints
