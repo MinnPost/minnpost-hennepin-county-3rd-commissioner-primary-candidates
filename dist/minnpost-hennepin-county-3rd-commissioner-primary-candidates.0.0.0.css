@@ -70,9 +70,11 @@ body .node-unpublished {
   filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=40);
   opacity: 0.4;
 }
+.mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .question-list .question .question-text {
+  margin-bottom: 1em;
+}
 .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .question-list .question .question-category {
   color: #7A7A7A;
-  margin-bottom: 1em;
 }
 .mp .minnpost-hennepin-county-3rd-commissioner-primary-candidates-container .question-list .question .question-options {
   margin-left: 1em;
